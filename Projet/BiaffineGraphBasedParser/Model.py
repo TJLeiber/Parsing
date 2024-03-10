@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
 
+# by convention SEQ_LENGTH is the uniform length of (padded) sentences in a batch
+# d is th number of dimension of every word vector
+# BATCH_SIZE is the number of sentences
+
 # this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
     '''
-    This is the last layer in the model, outputting an adjacency matrix of PADDED sentence
-    input (biases )
+    non-linear biaffine scorer
     '''
 
     # input batches number, sequence length, and embeddings_size
