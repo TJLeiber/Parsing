@@ -28,7 +28,7 @@ class Biaffine(nn.Module):
 
         self.b = nn.Parameter(torch.zeros(1)) # a single bias scalar
 
-    def foward(self, H, D):
+    def forward(self, H, D):
         '''
         :param H: A tensor containing heads representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
         :param D: A tensor containing dependent representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
