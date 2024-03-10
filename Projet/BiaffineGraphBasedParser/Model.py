@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 
-# by convention SEQ_LENGTH is the uniform length of (padded) sentences in a batch
-# d is th number of dimension of every word vector
+# CONVENTIONS
+# SEQ_LENGTH is the uniform length of (padded) sentences in a batch
+# d is the number of dimension of every word vector after MLP split
+# e is the number of dimensions of every word vector before MLP split
 # BATCH_SIZE is the number of sentences
+# when using einsum we use the same letter in large and small caps when referring to axis of same length, e.g. s and S may refer to SEQ_LENGTH axis
 
 # this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
