@@ -38,7 +38,7 @@ class Biaffine(nn.Module):
         # Recall --> Biaffine(v, u) := v.U.u + W.(concat(v, u)) + b
 
         # -------------------- v.U.u --------------------
-        U_product = torch.einsum("bse, xy, bSE-> bSs", H, self.U, D) # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+        U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D) # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
@@ -80,7 +80,7 @@ class Bilinear(nn.Module):
         '''
 
         # v.U.u
-        out = torch.einsum("bse, xy, bSE-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+        out = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         return out
 
