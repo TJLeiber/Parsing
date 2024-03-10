@@ -85,7 +85,9 @@ class Bilinear(nn.Module):
         return out
 
 class HeadMLP(nn.Module):
+    '''used to retain mostly head-relevant features of the top recurrent states (?) --> 'drop dependent features of word' '''
     pass # TODO
 
 class DepMLP(nn.Module):
+    '''used to retain mostly dependent-relevant features of the top recurrent states (?) --> 'drop head features of word' '''
     pass # TODO
