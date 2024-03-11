@@ -131,9 +131,7 @@ class Model(nn.Module):
     '''Combines building blocks in the Biaffine graph-based parserpipeline from preprocessed inputs to adjacency matrix output'''
     pass # TODO
 
-def fit_model():
+def fit_model(model: Model):
     '''
-    used to fit the model in an end-to-end manner
-    :return: 
-    '''
+    used to fit the model in an end-to-end manner'''
     pass # TODO
