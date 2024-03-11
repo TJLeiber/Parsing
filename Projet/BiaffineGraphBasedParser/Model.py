@@ -42,9 +42,9 @@ class Biaffine(nn.Module):
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
-        # for integrated bias concatenate ones along the word encoding axis of the Heads matrix
-        biases = torch.ones(H.size(0), H.size(1), 1)
-        H = H.cat((H, biases), dim=2) # get a one
+        # for integrated bias concatenate ones along the word encoding axis of the heads matrix H
+        ones = torch.ones(H.size(0), H.size(1), 1)
+        H = H.cat((H, ones), dim=2) # get a one
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
@@ -87,8 +87,8 @@ class SimpleBiaffine(nn.Module):
         # Recall --> SimpleBiaffine(v, u) := v.U.u + b
 
         # integrate bias
-        biases = torch.ones(H.size(0), H.size(1), 1)
-        H = H.cat((H, biases), dim=2) # get a one
+        ones = torch.ones(H.size(0), H.size(1), 1)
+        H = H.cat((H, ones), dim=2) # get a one
 
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
@@ -125,13 +125,10 @@ class Bilinear(nn.Module):
 
 
 class SplitMLP(nn.Module):
-    '''used to split incoming word representations into head and dependent representations
-    '''
+    '''used to split incoming word representations into head and dependent representations'''
     pass  # TODO
 
-def fit_model():
+def fit_model(X_train):
     '''
-    used to fit the model in an end-to-end manner
-    :return:
-    '''
+    used to fit the model in an end-to-end manner'''
     pass # TODO
