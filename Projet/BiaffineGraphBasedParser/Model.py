@@ -25,17 +25,15 @@ class Biaffine(nn.Module):
         # --> Biaffine(v, u) := v.U.u + W.(concat(v, u)) + b
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.zeros(d, d))  # [d x d]
+        self.U = nn.Parameter(torch.zeros(d + 1, d))  # [d + 1 x d] + 1 for integrated bias
 
         # a single vector of adequate size to return a scalar for W.(concat(v, u))
         self.W = nn.Parameter(torch.zeros(2 * d))  # [2*d]
 
-        self.b = nn.Parameter(torch.zeros(1))  # scalar
-
     def forward(self, H, D):
         '''
-        :param H: A tensor containing heads representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
-        :param D: A tensor containing dependent representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
+        :param H: A tensor containing head representations of words size [BATCH_SIZE x SEQ_LENGTH x d]
+        :param D: A tensor containing dependent representations of words size [BATCH_SIZE x SEQ_LENGTH x d]
         :return: A tensor containing the scores of each head dependent pairs for each sentence [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
         '''
 
@@ -43,6 +41,10 @@ class Biaffine(nn.Module):
 
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+
+        # for integrated bias concatenate ones along the word encoding axis of the Heads matrix
+        biases = torch.ones(H.size(0), H.size(1), 1)
+        H = H.cat((H, biases), dim=2) # get a one
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
@@ -59,7 +61,7 @@ class Biaffine(nn.Module):
         W_product = torch.einsum("ijkl,l->ijk", concat_batch, self.W)  # shape [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         # -------------------- FULL SCORE --------------------
-        out = U_product + W_product + self.b  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+        out = U_product + W_product  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         return out
 
@@ -73,10 +75,7 @@ class SimpleBiaffine(nn.Module):
         super(SimpleBiaffine, self).__init__()
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.zeros(d, d))  # [d x d]
-
-        self.b = nn.Parameter(torch.zeros(1))  # scalar
-
+        self.U = nn.Parameter(torch.zeros(d + 1, d))  # [d + 1 x d] (+ 1 along dim 0 for integrated bias)
 
     def forward(self, H, D):
         '''
@@ -87,13 +86,15 @@ class SimpleBiaffine(nn.Module):
 
         # Recall --> SimpleBiaffine(v, u) := v.U.u + b
 
+        # integrate bias
+        biases = torch.ones(H.size(0), H.size(1), 1)
+        H = H.cat((H, biases), dim=2) # get a one
+
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
-        # -------------------- FULL SCORE --------------------
-        out = U_product + self.b  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
-        return out
+        return U_product
 
 
 class Bilinear(nn.Module):
@@ -124,14 +125,13 @@ class Bilinear(nn.Module):
 
 
 class SplitMLP(nn.Module):
-    '''used to split incoming word representations into head and dependent representations'''
+    '''used to split incoming word representations into head and dependent representations
+    '''
     pass  # TODO
 
-class Model(nn.Module):
-    '''Combines building blocks in the Biaffine graph-based parserpipeline from preprocessed inputs to adjacency matrix output'''
-    pass # TODO
-
-def fit_model(model: Model):
+def fit_model():
     '''
-    used to fit the model in an end-to-end manner'''
+    used to fit the model in an end-to-end manner
+    :return:
+    '''
     pass # TODO
