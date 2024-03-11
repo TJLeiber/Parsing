@@ -129,6 +129,5 @@ class SplitMLP(nn.Module):
     pass  # TODO
 
 def fit_model(X_train):
-    '''
-    used to fit the model in an end-to-end manner'''
+    '''used to fit the model in an end-to-end manner'''
     pass # TODO
