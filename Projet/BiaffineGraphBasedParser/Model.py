@@ -124,9 +124,12 @@ class Bilinear(nn.Module):
 
 
 class SplitMLP(nn.Module):
-    '''used to split incoming word representations into head and dependent representations
-    '''
+    '''used to split incoming word representations into head and dependent representations'''
     pass  # TODO
+
+class Model(nn.Module):
+    '''Combines building blocks in the Biaffine graph-based parserpipeline from preprocessed inputs to adjacency matrix output'''
+    pass # TODO
 
 def fit_model():
     '''
