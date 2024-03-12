@@ -142,7 +142,7 @@ class SplitMLP(nn.Module):
 
     def forward(self, BiLSTM_layer):
         ''' expected defautl behavior is for args BiLSTM_layer = output_dim
-        :param BiLSTM last state [BACTH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
+        :param BiLSTM last state [BATCH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
         :return: head/dependent representations [BATCH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
         '''
 
