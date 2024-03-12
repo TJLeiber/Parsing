@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 
 # CONVENTIONS
-# SEQ_LENGTH is the uniform length of (padded) sentences in a batch
+# SEQ_LENGTH (or SEQUENCE_LENGTH) is the uniform length of (padded) sentences in a batch
 # d is the number of dimension of every word vector after MLP split
 # e is the number of dimensions of every word vector before MLP split
 # BATCH_SIZE is the number of sentences
@@ -123,10 +124,48 @@ class Bilinear(nn.Module):
 
         return out
 
-
 class SplitMLP(nn.Module):
     '''used to split incoming word representations into head and dependent representations'''
-    pass  # TODO
+
+    # default behavior should be BiLSTM_layer=output_dim
+    def __init__(self,batch_size, seq_length, BiLSTM_layer, hidden_dim, output_dim, dropout=0.5):
+        super(SplitMLP, self).__init__()
+
+        # first weight matrix [BiLSTM_layer + 1 x hidden_dim] (bias is intergated)
+        self.W_1 = nn.Linear(BiLSTM_layer + 1, hidden_dim)
+
+        # second weight matrix [hidden_dim + 1 x output_dim] (bias is integrated)
+        self.W_2 = nn.Linear(hidden_dim + 1, output_dim)
+
+        # we use dropout at the last layer during training
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, BiLSTM_layer):
+        ''' expected defautl behavior is for args BiLSTM_layer = output_dim
+        :param BiLSTM last state [BACTH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
+        :return: head/dependent representations [BATCH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
+        '''
+
+        # integrate bias ones
+        ones = torch.ones(self.batch_size, self.seq_length, 1)
+        BiLSTM_layer = torch.cat((BiLSTM_layer, ones), -1)
+
+        # first linear transformation
+        out = self.W_1(BiLSTM_layer)
+
+        # non-linear activation function
+        out = torch.relu(out)
+
+        # integrate bias ones
+        out = torch.cat((out, ones), -1)
+
+        # second linear transformation
+        out = self.W_2(out)
+
+        # apply dropout (note we can apply dropout after all linear transformations because out is passed to the biaffine scorer)
+        self.dropout(out)
+
+        return out
 
 class GraphBasedParser(nn.Module):
     def __init__(self, MLP_hidden_layer, d, embeddings="word2vec", POS_Embeddings=False, scorer="SimpleBiaffine"):
@@ -136,6 +175,7 @@ class GraphBasedParser(nn.Module):
 
     def forward(self):
         pass # TODO
+    
 
 def fit_model(X_train):
     '''used to fit the model in an end-to-end manner'''
