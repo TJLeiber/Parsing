@@ -128,6 +128,15 @@ class SplitMLP(nn.Module):
     '''used to split incoming word representations into head and dependent representations'''
     pass  # TODO
 
+class GraphBasedParser(nn.Module):
+    def __init__(self, MLP_hidden_layer, d, embeddings="word2vec", POS_Embeddings=False, scorer="SimpleBiaffine"):
+        super(GraphBasedParser, self).__init__()
+
+        pass # TODO
+
+    def forward(self):
+        pass # TODO
+
 def fit_model(X_train):
     '''used to fit the model in an end-to-end manner'''
     pass # TODO
