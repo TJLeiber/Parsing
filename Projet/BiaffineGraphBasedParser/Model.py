@@ -137,7 +137,7 @@ class SplitMLP(nn.Module):
         # second weight matrix [hidden_dim + 1 x output_dim] (bias is integrated)
         self.W_2 = nn.Linear(hidden_dim + 1, output_dim)
 
-        # we use dropout at the last layer during training
+        # we use dropout at the last layer during forward propagation
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, BiLSTM_layer):
