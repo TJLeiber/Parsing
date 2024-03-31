@@ -1,5 +1,4 @@
 # used to implement preprocessing of data building blocks
-
 # used to implement preprocessing of data building blocks
 import wget
 import zipfile
@@ -7,7 +6,7 @@ import pandas as pd
 import re
 from io import StringIO
 import torch
-import torch.nn as nn
+import json
 
 def load_data():
     '''downloads the data for semantic dependencies'''
@@ -59,7 +58,7 @@ def get_adj_mtrx(df, seq_length):
 
   return adj_mtrx
 
-def preprocessing(examples_str):
+def preprocessing(examples_str, glove=False):
 
     examples = re.split(r"\n#\d+", examples_str)
 
@@ -82,21 +81,26 @@ def preprocessing(examples_str):
     # concatenate all adjacency matrices along a new dimension
     Y = torch.stack(Y)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
-    # get the vocabulary
-    vocab = ['<pad>'] + sorted(set(pd.concat([df[1] for df in df_lst])))
+    if glove: # if we use glove embeddings we download the respective w2i mapping (see Embeddings/GloVe.py)
+        with open("./Embeddings/w2i.json") as f:
+            w2i = json.load(f)
+    else:
+        # get the vocabulary
+        vocab = ['<PAD>'] + ['<UNK>'] + sorted(set(pd.concat([df[1] for df in df_lst])))
 
-    # get quick access to indices for vectorization
-    w2i = {word: idx for idx, word in enumerate(vocab)}
+        # get quick access to indices for vectorization
+        w2i = {word: idx for idx, word in enumerate(vocab)}
 
     # get example sentences as indices
-    vectorized_sents = [[w2i[word] for word in sentence] for sentence in sentences]
+    vectorized_sents = [[w2i[word] if word in w2i else w2i["<UNK>"] for word in sentence] for sentence in sentences]
 
     # padding
     # get sentence lengths vector of size  BATCH_SIZE
     sent_lengths = torch.tensor(list(map(len, vectorized_sents)), dtype=torch.int8)
 
     # padded sequences tensor of size [BATCH_SIZE x SEQ_LENGTH]
-    sent_tensor = torch.zeros((len(vectorized_sents), max_length), dtype=torch.long)
+    pad_idx = w2i["<PAD>"]
+    sent_tensor = torch.full((len(vectorized_sents), max_length), pad_idx, dtype=torch.long)
 
     for idx, (sent, sent_len) in enumerate(zip(vectorized_sents, sent_lengths)):
         sent_tensor[idx, :sent_len] = torch.tensor(sent, dtype=torch.long)
@@ -105,4 +109,4 @@ def preprocessing(examples_str):
     # no need to sort in decreasing order since the examples were already sorted in the very beginning to allow mapping to Y_train, i.e. adjacency matrices
     X = sent_tensor
 
-    return X, Y
+    return (X, sent_lengths), Y
