@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from transformers.models.distilbert.modeling_distilbert import Embeddings
 
 
 # CONVENTIONS
@@ -13,7 +14,7 @@ import torch.optim as optim
 # this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
     '''
-    biaffine scorer --> computes v.U.u + W.(concat(v, u)) + b
+    biaffine scorer --> used to compute v.U.u + W.(concat(v, u)) + b
     '''
 
     # input batches number, sequence length, and embeddings_size
@@ -68,7 +69,7 @@ class Biaffine(nn.Module):
 
 
 class SimpleBiaffine(nn.Module):
-    '''simplification of the Biaffine scorer --> computes v.U.u + b
+    '''simplification of the Biaffine scorer --> used to compute v.U.u + b
     '''
 
     def __init__(self, d):
@@ -128,30 +129,30 @@ class SplitMLP(nn.Module):
     '''used to split incoming word representations into head and dependent representations'''
 
     # default behavior should be BiLSTM_layer=output_dim
-    def __init__(self,batch_size, seq_length, BiLSTM_layer, hidden_dim, output_dim, dropout=0.5):
+    def __init__(self, bilstm_hidden_size, hidden_dim, output_dim, dropout=0):
         super(SplitMLP, self).__init__()
 
         # first weight matrix [BiLSTM_layer + 1 x hidden_dim] (bias is intergated)
-        self.W_1 = nn.Linear(BiLSTM_layer + 1, hidden_dim)
+        self.w_1 = nn.Linear(bilstm_hidden_size + 1, hidden_dim)
 
         # second weight matrix [hidden_dim + 1 x output_dim] (bias is integrated)
-        self.W_2 = nn.Linear(hidden_dim + 1, output_dim)
+        self.w_2 = nn.Linear(hidden_dim + 1, output_dim)
 
-        # we use dropout at the last layer during forward propagation
+        # we use dropout at the last layer during training
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, BiLSTM_layer):
+    def forward(self, biLSTM_layer):
         ''' expected defautl behavior is for args BiLSTM_layer = output_dim
-        :param BiLSTM last state [BATCH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
+        :param BiLSTM last state [BACTH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
         :return: head/dependent representations [BATCH_SIZE x SEQ_LENGTH x BiLSTM_LAYER_SIZE]
         '''
 
-        # integrate bias ones
-        ones = torch.ones(self.batch_size, self.seq_length, 1)
-        BiLSTM_layer = torch.cat((BiLSTM_layer, ones), -1)
+        # integrate bias ones [BATCH_SIZE, SEQ_LENGTH, 1]
+        ones = torch.ones(self.biLSTM_layer.shape[0], self.biLSTM_layer.shape[1], 1)
+        biLSTM_layer = torch.cat((biLSTM_layer, ones), -1) # concatenate along the last dimension
 
         # first linear transformation
-        out = self.W_1(BiLSTM_layer)
+        out = self.w_1(biLSTM_layer)
 
         # non-linear activation function
         out = torch.relu(out)
@@ -160,18 +161,38 @@ class SplitMLP(nn.Module):
         out = torch.cat((out, ones), -1)
 
         # second linear transformation
-        out = self.W_2(out)
+        out = self.w_2(out)
 
         # apply dropout (note we can apply dropout after all linear transformations because out is passed to the biaffine scorer)
         self.dropout(out)
 
-        return out
+        return out # [BATCH_SIZE x SEQ_LENGTH x d]
 
 class GraphBasedParser(nn.Module):
-    def __init__(self, MLP_hidden_layer, d, embeddings="word2vec", POS_Embeddings=False, scorer="SimpleBiaffine"):
+    def __init__(self, MLP_hidden_layer, d, vocab, embeddings="pretrained", POS_Embeddings=False, scorer="SimpleBiaffine", train=False):
         super(GraphBasedParser, self).__init__()
 
-        pass # TODO
+        if embeddings == "pretrained":
+            self.embeddings = nn.Embedding(torch.load("glove.pt"))
+        else:
+            self.embeddings = nn.Embedding(len(vocab), 100)
+
+        self.bilstm = nn.LSTM(d, hidden_size=600, num_layers=3, batch_first=True, bidirectional=True)
+
+        if train:
+            self.MLP_head = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, dropout=0.25)
+            self.MLP_head = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, dropout=0.25)
+        else:
+            self.MLP_head =SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
+            self.MLP_dep = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
+            
+        if scorer == "SimpleBiaffine":
+            self.scorer = SimpleBiaffine(d)
+        elif scorer == "Biaffine":
+            self.scorer = Biaffine(d)
+        else:
+            self.scorer = Bilinear(d)
+            
 
     def forward(self):
         pass # TODO
