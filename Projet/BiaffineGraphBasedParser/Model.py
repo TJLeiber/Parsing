@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from transformers.models.distilbert.modeling_distilbert import Embeddings
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 # CONVENTIONS
@@ -185,16 +186,35 @@ class GraphBasedParser(nn.Module):
         else:
             self.MLP_head =SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
             self.MLP_dep = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
-            
+
         if scorer == "SimpleBiaffine":
             self.scorer = SimpleBiaffine(d)
         elif scorer == "Biaffine":
             self.scorer = Biaffine(d)
         else:
             self.scorer = Bilinear(d)
-            
 
-    def forward(self):
+
+    def forward(self, vectorized_X, sent_lengths): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
+        
+        # step 1: ------------------------------------------ENCODING------------------------------------------
+        
+        
+        # tensor of size [BACTH_SIZE x SEQ_LENGTH x EMBED_SIZE]
+        # no need to sort in decreasing order since the examples were already sorted in the very beginning to allow mapping to Y_train, i.e. adjacency matrices
+        X_train = self.embeddings(vectorized_X)
+
+        # packed X_train of size [batch_sum_seq_len X EMBEDDINGS_SIZE] --> used for biLSTM encoding only
+        packed_X_train = pack_padded_sequence(X_train, sent_lengths.cpu().numpy(), batch_first=True)
+
+        # sizes ...
+        packed_output, (ht, ct) = self.bilstm(packed_X_train)
+
+        # unpack X_Train packed
+        X_train_encoded, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        
+        
+        # step 2: ------------------------------------------SPLITTING LAST RECURRENT STATE (HEAD & DEP)------------------------------------------
         pass # TODO
     
 
