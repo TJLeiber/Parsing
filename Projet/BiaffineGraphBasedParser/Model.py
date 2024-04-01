@@ -220,8 +220,3 @@ class GraphBasedParser(nn.Module):
         out = self.scorer(heads, deps)
 
         return out
-    
-
-def fit_model(X_train):
-    '''used to fit the model in an end-to-end manner'''
-    pass # TODO
