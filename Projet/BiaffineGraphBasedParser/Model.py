@@ -47,7 +47,7 @@ class Biaffine(nn.Module):
 
         # for integrated bias concatenate ones along the word encoding axis of the heads matrix H
         ones = torch.ones(H.size(0), H.size(1), 1)
-        H = H.cat((H, ones), dim=2) # get a one
+        H = torch.cat((H, ones), dim=2) # get a one
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
@@ -91,7 +91,7 @@ class SimpleBiaffine(nn.Module):
 
         # integrate bias
         ones = torch.ones(H.size(0), H.size(1), 1)
-        H = H.cat((H, ones), dim=2) # get a one
+        H = torch.cat((H, ones), dim=2) # get a one
 
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
@@ -149,7 +149,7 @@ class SplitMLP(nn.Module):
         '''
 
         # integrate bias ones [BATCH_SIZE, SEQ_LENGTH, 1]
-        ones = torch.ones(self.biLSTM_layer.shape[0], self.biLSTM_layer.shape[1], 1)
+        ones = torch.ones(biLSTM_layer.shape[0], biLSTM_layer.shape[1], 1)
         biLSTM_layer = torch.cat((biLSTM_layer, ones), -1) # concatenate along the last dimension
 
         # first linear transformation
@@ -181,11 +181,11 @@ class GraphBasedParser(nn.Module):
         self.bilstm = nn.LSTM(d, hidden_size=600, num_layers=3, batch_first=True, bidirectional=True)
 
         if train:
-            self.MLP_head = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, dropout=0.25)
-            self.MLP_head = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, dropout=0.25)
+            self.MLP_head = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600 dropout=0.25)
+            self.MLP_dep = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600 dropout=0.25)
         else:
-            self.MLP_head =SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
-            self.MLP_dep = SplitMLP(d, bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600)
+            self.MLP_head =SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600)
+            self.MLP_dep = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600)
 
         if scorer == "SimpleBiaffine":
             self.scorer = SimpleBiaffine(d)
@@ -209,13 +209,20 @@ class GraphBasedParser(nn.Module):
 
         # sizes ...
         packed_output, (ht, ct) = self.bilstm(packed_X_train)
+        del ht, ct # not needed
 
         # unpack X_Train packed
         X_train_encoded, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         
-        
         # step 2: ------------------------------------------SPLITTING LAST RECURRENT STATE (HEAD & DEP)------------------------------------------
-        pass # TODO
+        # split recurrent states
+        heads = self.MLP_head(X_train_encoded)
+        deps = self.MLP_dep(X_train_encoded)
+
+        # step 3: -------------------------------------------SCORING CANDIDATE ARCS------------------------------------------
+        out = self.scorer(heads, deps)
+
+        return out
     
 
 def fit_model(X_train):
