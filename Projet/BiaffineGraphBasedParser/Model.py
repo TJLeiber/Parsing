@@ -170,19 +170,17 @@ class SplitMLP(nn.Module):
         return out # [BATCH_SIZE x SEQ_LENGTH x d]
 
 class GraphBasedParser(nn.Module):
-    def __init__(self, MLP_hidden_layer, d, vocab, embeddings="pretrained", POS_Embeddings=False, scorer="SimpleBiaffine", train=False):
+    def __init__(self, vocab, MLP_hidden_layer=600, d=600, embeddings="pretrained", POS_Embeddings=False, scorer="SimpleBiaffine", train=False):
         super(GraphBasedParser, self).__init__()
 
-        if embeddings == "pretrained":
-            self.embeddings = nn.Embedding(torch.load("glove.pt"))
-        else:
-            self.embeddings = nn.Embedding(len(vocab), 100)
 
-        self.bilstm = nn.LSTM(d, hidden_size=600, num_layers=3, batch_first=True, bidirectional=True)
+        self.embeddings = nn.Embedding(len(vocab), 100)
+
+        self.bilstm = nn.LSTM(input_size=100, hidden_size=600, num_layers=3, batch_first=True, bidirectional=True)
 
         if train:
-            self.MLP_head = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600 dropout=0.25)
-            self.MLP_dep = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600 dropout=0.25)
+            self.MLP_head = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600, dropout=0.25)
+            self.MLP_dep = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600, dropout=0.25)
         else:
             self.MLP_head =SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600)
             self.MLP_dep = SplitMLP(bilstm_hidden_size=self.bilstm.hidden_size * 2, hidden_dim=600, output_dim=600)
@@ -198,7 +196,6 @@ class GraphBasedParser(nn.Module):
     def forward(self, vectorized_X, sent_lengths): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
         
         # step 1: ------------------------------------------ENCODING------------------------------------------
-        
         
         # tensor of size [BACTH_SIZE x SEQ_LENGTH x EMBED_SIZE]
         # no need to sort in decreasing order since the examples were already sorted in the very beginning to allow mapping to Y_train, i.e. adjacency matrices
