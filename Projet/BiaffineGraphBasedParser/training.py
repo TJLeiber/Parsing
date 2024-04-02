@@ -71,10 +71,11 @@ def train_model(
     print("epoch:", epoch_counter)
     print("Patience left:", patience)
 
+    # HOW DO WE SHUFFLE ?
     # create a random permutation of examples (along batch axis)
-    perm = torch.randperm(X_train.size(0))
+    # perm = torch.randperm(X_train.size(0))
     # then shuffle the examples (and their targets in using same permutation) (and the respective sentence lengths)
-    shuff_X_train, shuff_Y_train, shuff_sent_lengths = X_train[perm], Y_train[perm], sent_lengths[perm]
+    # shuff_X_train, shuff_Y_train, shuff_sent_lengths = X_train[perm], Y_train[perm], sent_lengths[perm]
 
     # get logits
     dev_logits = model(X_dev)
