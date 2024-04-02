@@ -103,16 +103,16 @@ def train_model(
     epoch_counter += 1
 
     # iterate over batches
-    for i in range(0, shuff_X_train.shape.size(0), batch_size):
+    for i in range(0, X_train.shape.size(0), batch_size):
 
       # reset gradient for each batch
       model.zero_grad()
 
       # a batch of size BATCH_SIZE x SEQ_LENGTH (batch of vectorized sentences)
-      X_batch = shuff_X_train[i:i+batch_size, :]
+      X_batch = X_train[i:i+batch_size, :]
 
       # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
-      Y_batch = shuff_Y_train[i:i+batch_size, :, :]
+      Y_batch = Y_train[i:i+batch_size, :, :]
 
       logits = model(X_batch, sent_lengths)
 
