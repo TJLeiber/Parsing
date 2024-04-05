@@ -227,8 +227,8 @@ def train_model(
       # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
       Y_batch = Y_train[i:i+batch_size]
 
-      # respective sentence lengths
-      mask_batch = mask[i:i+batch_size]
+      # mask tensor for current batch 
+      mask_batch = mask[i:i+batch_size] # [BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH]
 
       # the shape of seq length can be changed here (in the biLSTM pass)
       # (we can sefely truncate Y_train accordingly in this case)
