@@ -23,11 +23,12 @@ class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
   def forward(self, pred, target, mask):
     # note that pred is already expected to be masked (cf. 'out' of forward in GraphBasedParser model)
 
-    # calculate the loss wrt each prediction
-    loss = mask * (super(BCEWithLogitsLoss_masked, self).forward(pred, target))
+    # calculate the loss wrt each prediction and apply mask (cancel out non-candidate arcs loss)
+    loss = mask * (super(BCEWithLogitsLoss_masked, self).forward(pred, target)) # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH] (since reduction='none')
 
     # vector of size [BATCH_SIZE] (mask.sum(dim=(1, 2)) gives us the nb of candidate arcs for each example)
-    loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2)) # the average loss for each (masked) example
+    # vector of size [BATCH_SIZE] (loss.sum(dim=(1, 2)) gives us the sum of the losses for each example
+    loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2)) # vector of size [BATCH_SIZE] containing the average loss for each example
 
     # scalar
     loss = loss.mean() # average loss over all (masked) predictions
