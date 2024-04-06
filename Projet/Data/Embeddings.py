@@ -9,14 +9,15 @@ class GloVe:
 
         # get a tensor version of the embeddings as attribute and unclude "<UNK>" and "<PAD>" tokens
         self.weights = torch.FloatTensor(self.model.vectors)
-        pad_unk = torch.randn(2, self.weights.shape[1]) * 0.01
-        self.weights = torch.cat((self.weights, pad_unk), dim=0)
+        pad_unk_root = torch.randn(3, self.weights.shape[1]) * 0.01
+        self.weights = torch.cat((self.weights, pad_unk_root), dim=0)
         self.embed_dim = self.weights.shape[1]
 
         # assign the respective indices
         self.w2i = {token: token_index for token_index, token in enumerate(self.model.index_to_key)}
         self.w2i["<PAD>"] = len(self.w2i)
         self.w2i["<UNK>"] = len(self.w2i)
+        self.w2i["<ROOT>"] = len(self.w2i)
         self.vocab = [tok for tok in self.w2i]
 
     def serialize(self):
