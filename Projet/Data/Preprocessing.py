@@ -11,7 +11,7 @@ def get_dm_adj_mtrx(df, seq_length):
   # get root
   for idx, val in enumerate(df[4]):
     if val == '+':
-      adj_mtrx[idx, idx] += 1
+      adj_mtrx[0, idx + 1] += 1 # add one to idx becuase root is not present in data frame
 
   # get head-dependent pairs
   nb_pred = 0
@@ -20,7 +20,7 @@ def get_dm_adj_mtrx(df, seq_length):
       nb_pred += 1
       for j, dep_label in enumerate(df[6 + nb_pred]):
         if dep_label != '_':
-          adj_mtrx[i, j] += 1
+          adj_mtrx[i + 1, j + 1] += 1 # add ones to (i, j) becuase root is not present in data frame
 
   return adj_mtrx
 
@@ -40,7 +40,7 @@ def extract_from_dm(dm_examples_str: str):
     df_lst = [pd.read_csv(StringIO(tab_str), sep="\t", header=None) for tab_str in tabular_strings]
 
     # get the sentences
-    sentences = [df[1].tolist() for df in df_lst]
+    sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst]
 
     max_length = len(max(sentences, key=len))
 
