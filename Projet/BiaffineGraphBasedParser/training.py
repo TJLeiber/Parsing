@@ -17,10 +17,11 @@ def get_mask(examples_tensor, sent_lengths):
 # -------------------------------customized loss function (inherits: torch.nn.BCEWithLogitsLoss-------------------------------
 class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
 
-  def __init__(self, weight=None, size_average=None, reduce=False, reduction='none', pos_weight=None):
+  def __init__(self, weight=None, size_average=None, reduce=False, reduction='none', pos_weight=None, avg=False, sumloss=True): 
     super(BCEWithLogitsLoss_masked, self).__init__(weight=weight, size_average=size_average, reduce=reduce, reduction=reduction, pos_weight=pos_weight)
 
   def forward(self, pred, target, mask):
+    '''metgod to compute the loss. Sum loss is appropriate for the current training method to account for different numbers of real candidate arcs in batches'''
     # note that pred is already expected to be masked (cf. 'out' of forward in GraphBasedParser model)
 
     # calculate the loss wrt each prediction and apply mask (cancel out non-candidate arcs loss)
@@ -28,10 +29,12 @@ class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
 
     # vector of size [BATCH_SIZE] (mask.sum(dim=(1, 2)) gives us the nb of candidate arcs for each example)
     # vector of size [BATCH_SIZE] (loss.sum(dim=(1, 2)) gives us the sum of the losses for each example
-    loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2)) # vector of size [BATCH_SIZE] containing the average loss for each example
-
-    # scalar
-    loss = loss.mean() # average loss over all (masked) predictions
+    if avg:
+      loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2)) # vector of size [BATCH_SIZE] containing the average loss for each example
+      # scalar
+      loss = loss.mean() # average loss over all (masked) predictions
+    if sumloss:
+      loss = loss.sum()
 
     return loss
     
