@@ -136,10 +136,10 @@ class SplitMLP(nn.Module):
         super(SplitMLP, self).__init__()
 
         # first weight matrix [BiLSTM_layer + 1 x hidden_dim] (bias is intergated)
-        self.w_1 = nn.Linear(bilstm_hidden_size + 1, hidden_dim)
+        self.w_1 = nn.Linear(bilstm_hidden_size, hidden_dim)
 
         # second weight matrix [hidden_dim + 1 x output_dim] (bias is integrated)
-        self.w_2 = nn.Linear(hidden_dim + 1, output_dim)
+        self.w_2 = nn.Linear(hidden_dim, output_dim)
 
         # we use dropout at the last layer during training
         self.dropout = nn.Dropout(dropout)
@@ -156,8 +156,8 @@ class SplitMLP(nn.Module):
           device = torch.device("cpu")
 
         # integrate bias ones [BATCH_SIZE, SEQ_LENGTH, 1]
-        ones = torch.ones(biLSTM_layer.shape[0], biLSTM_layer.shape[1], 1, device=biLSTM_layer.device)
-        biLSTM_layer = torch.cat((biLSTM_layer, ones), -1) # concatenate along the last dimension
+        # ones = torch.ones(biLSTM_layer.shape[0], biLSTM_layer.shape[1], 1, device=biLSTM_layer.device)
+        # biLSTM_layer = torch.cat((biLSTM_layer, ones), -1) # concatenate along the last dimension
 
         # first linear transformation
         out = self.w_1(biLSTM_layer)
