@@ -165,9 +165,6 @@ class SplitMLP(nn.Module):
         # non-linear activation function
         out = torch.relu(out)
 
-        # integrate bias ones
-        out = torch.cat((out, ones), -1)
-
         # second linear transformation
         out = self.w_2(out)
 
