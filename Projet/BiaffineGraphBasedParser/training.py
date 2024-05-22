@@ -38,14 +38,17 @@ class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
 
     return loss
     
-# ----------------------------------TWO FUNCTIONS USED TO EVALUATE CLASSIFIER (PRED, RECALL, FSCORE, OVERALL ACCURACY)----------------------------------
+# ----------------------------------FUNCTIONS USED TO EVALUATE CLASSIFIER (PRED, RECALL, FSCORE, OVERALL ACCURACY)----------------------------------
+import torch
+
 def safe_divide(numerator, denominator):
     """Safely divide two numbers, returning 0 if the denominator is zero."""
     return numerator / denominator if denominator else 0
 
+
 def mtrx_accuracy(pred, target, seq_lengths):
   '''given a predicted adjacency matrix, a target adjacency matrix and a seq_length tensor (to mask relevant indices)
-  output the percentage of correctly predicted edges out of the relevant edges
+  output the fraction of correctly predicted edges out of the relevant edges
   '''
 
   # get model (if model is on GPU then so is pred)
@@ -57,13 +60,29 @@ def mtrx_accuracy(pred, target, seq_lengths):
   mask = get_mask(target, seq_lengths).to(device)
 
   #find element-wise matches
-  all_matches = (mask * ((target == pred).int())).sum().item()
+  all_matches = (mask * ((target == pred).int())).sum().item() # returns number of total matches for candidate arcs
 
   # nb of all candidate arcs
-  all_candidates = (seq_lengths * seq_lengths).sum().item()
+  all_candidates = mask.sum().item() # total number of candidate arcs
 
   # total acc
-  tot_acc = all_matches / all_candidates
+  accuracy = all_matches / all_candidates
+
+  return accuracy
+
+def mtrx_recall(pred, target, seq_lengths):
+  '''
+  given predictions, a tagret tensor and sequence lengths tensor compute recall w.r.t. predictions of real candidate edges (1s)
+  --> true positives / (true positives + false negatives)
+  '''
+
+  # get model (if model is on GPU then so is pred)
+  device = pred.device
+  target = target.to(device)
+  seq_lengths = seq_lengths.to(device)
+
+  # first get the mask
+  mask = get_mask(target, seq_lengths).to(device)
 
   # get number of all matching 1s (for real candidate arcs)
   num_matching_1s = (mask * (pred * target)).sum().item()
@@ -74,16 +93,47 @@ def mtrx_accuracy(pred, target, seq_lengths):
   # accuracy is given by ration of predicated edges over nb of possible, i.e. relevant edges´
   recall = safe_divide(num_matching_1s, num_target_arcs)
 
+  return recall
+
+def mtrx_precision(pred, target, seq_lengths):
+  '''
+  given predictions, a tagret tensor and sequence lengths tensor compute  precision w.r.t. predictions of real candidate edges (1s)
+  --> true positives / (true positives + false positives)
+  '''
+
+  # get model (if model is on GPU then so is pred)
+  device = pred.device
+  target = target.to(device)
+  seq_lengths = seq_lengths.to(device)
+
+  # first get the mask
+  mask = get_mask(target, seq_lengths).to(device)
+
+  # get number of all matching 1s (for real candidate arcs)
+  num_matching_1s = (mask * (pred * target)).sum().item()
+
   # total number of 1s that were predicted (in the relevant part of the pred tensor)
   predicted_1s = (pred * mask).sum().item()
 
   # ratio of true positives over positives prediction
   precision = safe_divide(num_matching_1s, predicted_1s)
 
+  return precision 
+
+def mtrx_fscore(pred, target, seq_lengths):
+  '''
+  given predictions, a tagret tensor and sequence lengths tensor compute  fscore w.r.t. predictions of real candidate edges (1s)
+  --> (2*precision*recall)/(precision + recall)
+  '''
+
+  # get precision and recall
+  precision = mtrx_precision(pred, target, seq_lengths)
+  recall = mtrx_recall(pred, target, seq_lengths)
+
   # harmonic mean of precision and recall
   fscore = safe_divide((2*precision * recall), (precision + recall))
 
-  return recall, precision, fscore, tot_acc
+  return fscore
 
 # ---------------------------------- TRAINING FUNCTION ----------------------------------
 def train_model(
