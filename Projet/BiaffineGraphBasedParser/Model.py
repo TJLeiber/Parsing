@@ -78,8 +78,8 @@ class SimpleBiaffine(nn.Module):
         super(SimpleBiaffine, self).__init__()
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.Tensor(d + 1, d))  # [d + 1 x d] (+ 1 along dim 0 for integrated bias)
-        init.zeros_(self.U)
+        self.U = nn.Parameter(torch.Tensor(d + 1, d))  # [d + 1 x d] (d + 1 integrated bias)
+        init.xavier_normal_(self.U)
 
 
     def forward(self, H, D):
@@ -92,15 +92,15 @@ class SimpleBiaffine(nn.Module):
         # Recall --> SimpleBiaffine(v, u) := v.U.u + b
 
         # integrate bias
-        ones = torch.ones(H.size(0), H.size(1), 1, device=self.U.device)
-        H = torch.cat((H, ones), dim=2) # get a one
+        ones = torch.ones(H.size(0), H.size(1), 1, device=self.U.device) # H and D have the same size, hence 'ones' can be reused
+        H = torch.cat((H, ones), dim=2) # add bias
+        # D = torch.cat((D, ones), dim=2) # add bias
 
         # -------------------- v.U.u --------------------
-        U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
-
+        U_product = torch.einsum("bxi,ij,byj->bxy", H, self.U, D)  # [BATCH_SIZE x NB_CLASSES x SEQ_LENGTH x SEQ_LENGTH]
+        # U_product.squeeze(1) # we only have one output class
 
         return U_product
-
 
 class Bilinear(nn.Module):
     ''' Version of SimpleBiaffine scorer with no bias --> computes v.U.u
