@@ -78,8 +78,8 @@ class SimpleBiaffine(nn.Module):
         super(SimpleBiaffine, self).__init__()
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.Tensor(d + 1, d))  # [d + 1 x d] (d + 1 integrated bias)
-        init.xavier_normal_(self.U)
+        self.U = nn.Parameter(torch.Tensor(d + 1, d))  # [d + 1 x d + 1] (d + 1 integrated bias)
+        init.zeros_(self.U)
 
 
     def forward(self, H, D):
@@ -101,6 +101,7 @@ class SimpleBiaffine(nn.Module):
         # U_product.squeeze(1) # we only have one output class
 
         return U_product
+
 
 class Bilinear(nn.Module):
     ''' Version of SimpleBiaffine scorer with no bias --> computes v.U.u
@@ -179,30 +180,36 @@ class GraphBasedParser(nn.Module):
         super(GraphBasedParser, self).__init__()
 
         # initialize embeddings
-        if embed=="pretrained":
+        if embed=="static":
           self.embed = "pretrained"
           print("loading pretrained embeddings...")
           glove = GloVe()
-          self.embeddings = nn.Embedding(len(glove.vocab), glove.embed_dim)
-          self.embeddings.weight = nn.Parameter(glove.weights)
+          self.embeddings = nn.Embedding.from_pretrained(glove.weights, freeze=False) # glove.weights returns a tensor of size [|V| x EMBEDDINGS_DIM]
           self.w2i = glove.w2i
+          self.i2w = glove.vocab
           print("embeddings loaded!")
-        else:
+        elif embed == "scratch":
           self.embed="scratch"
-          self.embeddings = nn.Embedding(len(vocab), 40)
+          self.embeddings = nn.Embedding(len(vocab), 100)
+          self.embeddings.weight.requires_grad = True # enables fine tuning of embeddings
           self.vocab = vocab
           self.w2i = get_w2i(self.vocab)
+        elif embed == "contextual":
+          pass
+        else:
+          raise ValueError("Invalid kwarg for 'embed'. Must choose 'static', 'contextual' or 'scratch'.")
 
         # initialize biLSTM
-        self.bilstm = nn.LSTM(self.embeddings.weight.shape[1], hidden_size=d, num_layers=3, batch_first=True, bidirectional=True)
+        self.bilstm = nn.LSTM(self.embeddings.weight.shape[1], hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33)
 
         # initialize two MLPs which yield head and dependent representations
-        self.MLP_head = SplitMLP(bilstm_hidden_size=d * 2, hidden_dim=d, output_dim=d, dropout=0.25)
-        self.MLP_dep = SplitMLP(bilstm_hidden_size=d * 2, hidden_dim=d, output_dim=d, dropout=0.25)
+        self.MLP_head = SplitMLP(bilstm_hidden_size=d * 2, hidden_dim=d, output_dim=d, dropout=0.33)
+        self.MLP_dep = SplitMLP(bilstm_hidden_size=d * 2, hidden_dim=d, output_dim=d, dropout=0.33)
 
         # initialize the scorer (Biaffine function)
         if scorer == "SimpleBiaffine":
             self.scorer = SimpleBiaffine(d)
+            # self.scorer = nn.Bilinear(d, d, 110)
         elif scorer == "Biaffine":
             self.scorer = Biaffine(d)
         elif scorer == "Bilinear":
@@ -215,10 +222,7 @@ class GraphBasedParser(nn.Module):
     def forward(self, X): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
 
         # check cuda
-        if torch.cuda.is_available():
-          device = torch.device("cuda")
-        else:
-          device = torch.device("cpu")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # step 0: ------------------------------------------SORTING, VECTORIZING AND PADDING------------------------------------------
 
@@ -274,8 +278,18 @@ class GraphBasedParser(nn.Module):
 
         # we ignore edges involving pad tokens by multipyling them with zero
         # --> done via elementwise multiplication with a mask tensor
+        """
         mask = get_mask(out, X_lengths)
         mask = mask.to(out.device)
         out = out * mask
+        """
 
         return out
+
+    def predict(self, X):
+      '''given an input list of lists of sentences return all their adjacency matrices representing semantic relations'''
+
+      # take sigmoid over logit and then round
+      with torch.no_grad():
+        pred = torch.round(torch.sigmoid(self.forward(X)))
+      return pred
