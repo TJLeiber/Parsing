@@ -152,16 +152,19 @@ def train_model(
     Y_train, # target values for training set
     X_dev, # dev examples to compute leanring progress (relevant for patience)
     Y_dev, # target values for dev set
-    learning_rate=0.01, # learning rate (hyperparam)
-    betas=(0, 0.95), # Adam specific hyperparam
+    learning_rate=1e-4, # learning rate (hyperparam)
+    betas=(0.9, 0.9), # Adam specific hyperparam
     patience=10, # patience (hyperparam)
     max_epochs=10, # maximum number of epochs (hyperparam)
     batch_size=300, # batch_size (hyperparam)
-    pos_weight_factor=0.5, # factor multiplied with pos_weight, i.e. weight attatched to positive classes ((num_negatives / num_positives)*pos_weight_factor)
-    scheduled=True
+    scheduled=False,
+    weight_1s=1, # weight attached to loss w.r.t. predictions concerning existing arcs
+    loss_lst = None # when a list is passed it will be filled with the computed losses
     ):
 
   '''implementation of a training algorithm to update parameters of a model'''
+
+  steps = 0 # keep count of param updates
 
   # first we check if GPU is available
   if torch.cuda.is_available():
@@ -188,8 +191,10 @@ def train_model(
   # declare some variables
   breaking_condition_met = False # variable which turns to true iff some breaking condition (early stop, max_epochs etc. is met)
   epoch_counter = 0 # variable to keep track of total number of epochs
-  fscore_dev = 0 # variable to keep track of progress for accuracy on dev set (for early stopping)
+  fscore_last = 0 # variable to keep track of progress for accuracy on dev set (for early stopping)
   initial_patience = patience # variable that is not meant to change as reference in early stopping condition
+  loss = "-" # not of correct type yet. Will be float during training
+  norm_loss = "-" # not of correct type yet. Will be a float during training
 
   # declare optimization algo and loss
   optimizer = optim.Adam(model.parameters(), lr=learning_rate, betas=betas, weight_decay=0.000000003)
@@ -199,17 +204,15 @@ def train_model(
   if scheduled:
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.05)
 
-  num_positives = Y_train.sum().item()
-  train_sent_lengths = get_sentence_lengths(X_train)
-  num_negatives = (train_sent_lengths * train_sent_lengths).sum().item() - num_positives
+  """num_positives = Y_train.sum().item()
+  num_negatives = (train_sentence_lengths * train_sentence_lengths).sum().item() - num_positives
   # a constant defined via (nb 0s / nb 1s) in the training set. Will favor the underrepresented class when computing the loss
   pos_weights = torch.tensor((num_negatives/num_positives) * pos_weight_factor, device=device) # will be broadcasted across 'target axis' i.e. any axis of target adjacency matrix
-  print("pos_weights:", pos_weights)
+  print("pos_weights:", pos_weights)"""
 
-  if pos_weight_factor:
-    criterion = BCEWithLogitsLoss_masked(pos_weight=pos_weights)
-  else:
-    criterion = BCEWithLogitsLoss_masked()
+  criterion = BCEWithLogitsLoss_masked(weight_1s=weight_1s)
+  criterion_dev = BCEWithLogitsLoss_masked()
+
 
   while not breaking_condition_met: # turn until some breaking condition is met (patience ran out or max_num_epochs is met)
     print("------------------------------------------")
@@ -226,41 +229,48 @@ def train_model(
     Y_train = Y_train[indices_tensor]
     mask[indices_tensor]
 
-    # getting predictions
-    dev_pred= torch.round(torch.sigmoid(model(X_dev)))
+    # getting predictions on dev set
+    dev_pred = model.predict(X_dev)
 
     #  # calculate the accuracy on dev set (subset)
-    recall, precision, fscore, tot_acc = mtrx_accuracy(dev_pred, Y_dev, dev_sent_lengths)
-    print("recall on dev set:", round(recall, 2) * 100, "%")
-    print("precision on dev set:", round(precision, 2) * 100, "%")
-    print("fscore on dev set:", round(fscore, 4), "/ 1.0")
-    print("total match ratio including 1s & 0s:", round(tot_acc, 2) * 100, "%")
+    print("shape pred:", dev_pred.shape)
+    print("shape Y:", Y_dev.shape)
+    accuracy = mtrx_accuracy(dev_pred, Y_dev, dev_sent_lengths)
+    recall = mtrx_recall(dev_pred, Y_dev, dev_lengths)
+    precision = mtrx_precision(dev_pred, Y_dev, dev_lengths)
+    fscore = mtrx_fscore(dev_pred, Y_dev, dev_lengths)
+
+    print(f"Total accuracy on dev set: {(accuracy * 100):.2f}%")
+    print(f"Recall on dev set: {(recall * 100):.2f}%")
+    print(f"Precision on dev set: {(precision * 100):.2f}%")
+    print(f"Fscore on dev set: {(fscore * 100):.2f}%")
+    print(f"loss on last epoch: {loss}")
+    print(f"normalized loss last epoch {norm_loss}")
+
     print("---------")
     del dev_pred
 
     # calculate the accuracy on (subset of) train set
-    """
-    train_pred = torch.round(torch.sigmoid(model(X_train[:100]))).to(device)
+
+    """train_pred = torch.round(torch.sigmoid(model(X_train[:100]))).to(device)
     Y_train_trunc = Y_train[:, :train_pred.size(1), :train_pred.size(2)]
     recall, precision, fscore = mtrx_accuracy(train_pred, Y_train_trunc[:100], get_sentence_lengths(X_train[:100]).to(device))
     print("recall on train set:", round(recall, 2) * 100, "%")
     print("precision on train set:", round(precision, 2) * 100, "%")
     print("fscore on train set:", round(fscore, 4), "/ 1.0")
     print("---------")
-    del train_pred
-    """
+    del train_pred"""
 
     # check if patience needs to be decreased (when accuracy on dev set decreased)
-    if fscore_dev > fscore:
+    if fscore_last >= fscore:
       patience -= 1
     else:
       patience = initial_patience
+      # update to the current accuracy
+      fscore_last = fscore
     print("Patience left:", patience)
     print("------------------------------------------")
     print()
-
-    # update to the current accuracy
-    fscore_dev = fscore
 
     # see if a breaking condition applies
     if not patience or epoch_counter >= max_epochs:
@@ -287,8 +297,8 @@ def train_model(
       # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
       Y_batch = Y_train[i:i+batch_size]
 
-      # mask tensor for current batch 
-      mask_batch = mask[i:i+batch_size] # [BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH]
+      # respective sentence lengths
+      mask_batch = mask[i:i+batch_size]
 
       # the shape of seq length can be changed here (in the biLSTM pass)
       # (we can sefely truncate Y_train accordingly in this case)
@@ -297,14 +307,32 @@ def train_model(
       mask_batch = mask_batch[:, :logits.size(1), :logits.size(2)]
 
       # compute the (masked) loss
-      # loss = criterion(logits, Y_batch, mask_batch)
       loss = criterion(logits, Y_batch, mask_batch)
+      # loss_dev = criterion_dev(logits, Y_batch, mask_batch)
+      norm_loss = loss / mask_batch.sum() # loss relative to the number of candidate arcs in a batch
+
+      if loss_lst is not None:
+        loss_lst.append(norm_loss)
+
+      """losses_train.append(loss)
+      losses_dev.append(loss_dev)"""
 
       # perform backward propagation to get the gradient wrt parameters
       loss.backward()
 
+      """
+      print("embeddings gradients:", model.embeddings.weight.grad)
+      print("some bilstm gradients:", model.bilstm.all_weights[0][0].grad)
+      print("MLP first layer gradient:", model.MLP_head.w_1.weight.grad)
+      print("MLP second layer gradient:", model.MLP_dep.w_2.weight.grad)
+      print("scorer U matrix grad:", model.scorer.U.grad)
+      """
+
+
       # update the parameters according to leanring rate and calculated gradient
       optimizer.step()
+
+      steps += 1
 
     if scheduled:
       scheduler.step() # step after each epoch
