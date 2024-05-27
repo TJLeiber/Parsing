@@ -17,23 +17,30 @@ def get_mask(examples_tensor, sent_lengths):
 # -------------------------------customized loss function (inherits: torch.nn.BCEWithLogitsLoss-------------------------------
 class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
 
-  def __init__(self, weight=None, size_average=None, reduce=False, reduction='none', pos_weight=None, avg=False, sumloss=True): 
+  def __init__(self, weight=None, size_average=None, reduce=False, reduction='none', pos_weight=None, avg=False, sumloss=True, weight_1s=1):
     super(BCEWithLogitsLoss_masked, self).__init__(weight=weight, size_average=size_average, reduce=reduce, reduction=reduction, pos_weight=pos_weight)
+    self.avg = avg
+    self.sumloss = sumloss
+    self.weight_1s = weight_1s
 
   def forward(self, pred, target, mask):
-    '''metgod to compute the loss. Sum loss is appropriate for the current training method to account for different numbers of real candidate arcs in batches'''
-    # note that pred is already expected to be masked (cf. 'out' of forward in GraphBasedParser model)
+
+    device = pred.device
+    ones = torch.ones(target.shape).to(device)
+
+    weight = (((target * ones * self.weight_1s) + 1) - target) # returns a tensor with 1s for 0 entries and weight_1s for 1s entries in the target
 
     # calculate the loss wrt each prediction and apply mask (cancel out non-candidate arcs loss)
     loss = mask * (super(BCEWithLogitsLoss_masked, self).forward(pred, target)) # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH] (since reduction='none')
+    loss = loss * weight
 
     # vector of size [BATCH_SIZE] (mask.sum(dim=(1, 2)) gives us the nb of candidate arcs for each example)
     # vector of size [BATCH_SIZE] (loss.sum(dim=(1, 2)) gives us the sum of the losses for each example
-    if avg:
+    if self.avg:
       loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2)) # vector of size [BATCH_SIZE] containing the average loss for each example
       # scalar
       loss = loss.mean() # average loss over all (masked) predictions
-    if sumloss:
+    elif self.sumloss:
       loss = loss.sum()
 
     return loss
