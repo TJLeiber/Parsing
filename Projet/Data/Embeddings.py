@@ -7,7 +7,7 @@ class GloVe:
     def __init__(self):
         self.model = api.load("glove-wiki-gigaword-100")
 
-        # get a tensor version of the embeddings as attribute and unclude "<UNK>" and "<PAD>" tokens
+        # get a tensor version of the embeddings as attribute and unclude "<UNK>", "<PAD>" and "<ROOT>" tokens
         self.weights = torch.FloatTensor(self.model.vectors)
         pad_unk_root = torch.randn(3, self.weights.shape[1]) * 0.01
         self.weights = torch.cat((self.weights, pad_unk_root), dim=0)
@@ -28,4 +28,4 @@ class GloVe:
 
     def load(self):
       glove = torch.load("./glove.pt")
-      return glove# Everything Embedding code related goes here
+      return glove
