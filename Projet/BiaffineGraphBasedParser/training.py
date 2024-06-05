@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import math
+from random import shuffle
 
 # -------------------------------FUNCTION TO RETRIEVE MASK-------------------------------
 def get_mask(examples_tensor, sent_lengths):
-  '''given a tensor of size BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH return a mask tensor containing ones for candidate edges
+  '''
+  given a tensor of size BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH return a mask tensor containing ones for candidate edges
   '''
 
   mask = torch.zeros(examples_tensor.shape, dtype=torch.long)
@@ -16,6 +19,13 @@ def get_mask(examples_tensor, sent_lengths):
 
 # -------------------------------customized loss function (inherits: torch.nn.BCEWithLogitsLoss-------------------------------
 class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
+  '''
+  same as BCEWithLogitsLoss but reuiring a mask in the forward method to ignore irrelevant predictions which ought not contribute to the loss
+  kwargs sumloss, avg and weight_1s are added to constructor
+  weight_1s: weight multiplied with losses of predictions that are 1 in gold target
+  sumloss: if set to True loss will be summed
+  avg: if set to True the mean of all losses will be taken
+  '''
 
   def __init__(self, weight=None, size_average=None, reduce=False, reduction='none', pos_weight=None, avg=False, sumloss=True, weight_1s=1):
     super(BCEWithLogitsLoss_masked, self).__init__(weight=weight, size_average=size_average, reduce=reduce, reduction=reduction, pos_weight=pos_weight)
@@ -24,6 +34,11 @@ class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
     self.weight_1s = weight_1s
 
   def forward(self, pred, target, mask):
+    '''
+    pred: a predictions matrix with logits as values
+    target: a target matrix consisting with 1 or 0 as values
+    mask: a mask matrix of shape target.shape with 1 as values for predictions which contribute to the loss and otherwise 0
+    '''
 
     device = pred.device
     ones = torch.ones(target.shape).to(device)
@@ -46,8 +61,6 @@ class BCEWithLogitsLoss_masked(nn.BCEWithLogitsLoss):
     return loss
     
 # ----------------------------------FUNCTIONS USED TO EVALUATE CLASSIFIER (PRED, RECALL, FSCORE, OVERALL ACCURACY)----------------------------------
-import torch
-
 def safe_divide(numerator, denominator):
     """Safely divide two numbers, returning 0 if the denominator is zero."""
     return numerator / denominator if denominator else 0
@@ -57,23 +70,23 @@ def mtrx_accuracy(pred, target, seq_lengths):
   '''given a predicted adjacency matrix, a target adjacency matrix and a seq_length tensor (to mask relevant indices)
   output the fraction of correctly predicted edges out of the relevant edges
   '''
+  with torch.no_grad():
+    # get model (if model is on GPU then so is pred)
+    device = pred.device
+    target = target.to(device)
+    seq_lengths = seq_lengths.to(device)
 
-  # get model (if model is on GPU then so is pred)
-  device = pred.device
-  target = target.to(device)
-  seq_lengths = seq_lengths.to(device)
+    # first get the mask
+    mask = get_mask(target, seq_lengths).to(device)
 
-  # first get the mask
-  mask = get_mask(target, seq_lengths).to(device)
+    #find element-wise matches
+    all_matches = (mask * ((target == pred).int())).sum().item() # returns number of total matches for candidate arcs
 
-  #find element-wise matches
-  all_matches = (mask * ((target == pred).int())).sum().item() # returns number of total matches for candidate arcs
+    # nb of all candidate arcs
+    all_candidates = mask.sum().item() # total number of candidate arcs
 
-  # nb of all candidate arcs
-  all_candidates = mask.sum().item() # total number of candidate arcs
-
-  # total acc
-  accuracy = all_matches / all_candidates
+    # total acc
+    accuracy = all_matches / all_candidates
 
   return accuracy
 
@@ -82,23 +95,23 @@ def mtrx_recall(pred, target, seq_lengths):
   given predictions, a tagret tensor and sequence lengths tensor compute recall w.r.t. predictions of real candidate edges (1s)
   --> true positives / (true positives + false negatives)
   '''
+  with torch.no_grad():
+    # get model (if model is on GPU then so is pred)
+    device = pred.device
+    target = target.to(device)
+    seq_lengths = seq_lengths.to(device)
 
-  # get model (if model is on GPU then so is pred)
-  device = pred.device
-  target = target.to(device)
-  seq_lengths = seq_lengths.to(device)
+    # first get the mask
+    mask = get_mask(target, seq_lengths).to(device)
 
-  # first get the mask
-  mask = get_mask(target, seq_lengths).to(device)
+    # get number of all matching 1s (for real candidate arcs)
+    num_matching_1s = (mask * (pred * target)).sum().item()
 
-  # get number of all matching 1s (for real candidate arcs)
-  num_matching_1s = (mask * (pred * target)).sum().item()
+    # number of positives in target is just sum of all 1s in the target tensor)
+    num_target_arcs = (target).sum().item()
 
-  # number of positives in target is just sum of all 1s in the target tensor)
-  num_target_arcs = (target).sum().item()
-
-  # accuracy is given by ration of predicated edges over nb of possible, i.e. relevant edges´
-  recall = safe_divide(num_matching_1s, num_target_arcs)
+    # accuracy is given by ration of predicated edges over nb of possible, i.e. relevant edges´
+    recall = safe_divide(num_matching_1s, num_target_arcs)
 
   return recall
 
@@ -107,25 +120,25 @@ def mtrx_precision(pred, target, seq_lengths):
   given predictions, a tagret tensor and sequence lengths tensor compute  precision w.r.t. predictions of real candidate edges (1s)
   --> true positives / (true positives + false positives)
   '''
+  with torch.no_grad():
+    # get model (if model is on GPU then so is pred)
+    device = pred.device
+    target = target.to(device)
+    seq_lengths = seq_lengths.to(device)
 
-  # get model (if model is on GPU then so is pred)
-  device = pred.device
-  target = target.to(device)
-  seq_lengths = seq_lengths.to(device)
+    # first get the mask
+    mask = get_mask(target, seq_lengths).to(device)
 
-  # first get the mask
-  mask = get_mask(target, seq_lengths).to(device)
+    # get number of all matching 1s (for real candidate arcs)
+    num_matching_1s = (mask * (pred * target)).sum().item()
 
-  # get number of all matching 1s (for real candidate arcs)
-  num_matching_1s = (mask * (pred * target)).sum().item()
+    # total number of 1s that were predicted (in the relevant part of the pred tensor)
+    predicted_1s = (pred * mask).sum().item()
 
-  # total number of 1s that were predicted (in the relevant part of the pred tensor)
-  predicted_1s = (pred * mask).sum().item()
+    # ratio of true positives over positives prediction
+    precision = safe_divide(num_matching_1s, predicted_1s)
 
-  # ratio of true positives over positives prediction
-  precision = safe_divide(num_matching_1s, predicted_1s)
-
-  return precision 
+  return precision
 
 def mtrx_fscore(pred, target, seq_lengths):
   '''
@@ -133,12 +146,13 @@ def mtrx_fscore(pred, target, seq_lengths):
   --> (2*precision*recall)/(precision + recall)
   '''
 
-  # get precision and recall
-  precision = mtrx_precision(pred, target, seq_lengths)
-  recall = mtrx_recall(pred, target, seq_lengths)
+  with torch.no_grad():
+    # get precision and recall
+    precision = mtrx_precision(pred, target, seq_lengths)
+    recall = mtrx_recall(pred, target, seq_lengths)
 
-  # harmonic mean of precision and recall
-  fscore = safe_divide((2*precision * recall), (precision + recall))
+    # harmonic mean of precision and recall
+    fscore = safe_divide((2*precision * recall), (precision + recall))
 
   return fscore
 
@@ -159,7 +173,8 @@ def train_model(
     batch_size=300, # batch_size (hyperparam)
     scheduled=False,
     weight_1s=1, # weight attached to loss w.r.t. predictions concerning existing arcs
-    loss_lst = None # when a list is passed it will be filled with the computed losses
+    loss_lst = None, # when a list is passed it will be filled with the computed losses
+    sort_batches=False # when set to True, batches are sorted in decreasing order of their length each time. Default is False
     ):
 
   '''implementation of a training algorithm to update parameters of a model'''
@@ -179,9 +194,9 @@ def train_model(
 
   Y_dev = Y_dev.to(device)
   Y_train = Y_train.to(device)
-  train_sentence_lengths = get_sentence_lengths(X_train).to(device)
-  mask = get_mask(Y_train, train_sentence_lengths).to(device) # will be used to only consider loss for real candidate arcs
-  dev_sent_lengths = get_sentence_lengths(X_dev).to(device)
+  train_lengths = get_sentence_lengths(X_train, include_root=True).to(device)
+  mask = get_mask(Y_train, train_lengths).to(device) # will be used to only consider loss for real candidate arcs
+  dev_lengths = get_sentence_lengths(X_dev, include_root=True).to(device)
 
   if torch.cuda.is_available():
     print("moved model to GPU")
@@ -204,14 +219,8 @@ def train_model(
   if scheduled:
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.05)
 
-  """num_positives = Y_train.sum().item()
-  num_negatives = (train_sentence_lengths * train_sentence_lengths).sum().item() - num_positives
-  # a constant defined via (nb 0s / nb 1s) in the training set. Will favor the underrepresented class when computing the loss
-  pos_weights = torch.tensor((num_negatives/num_positives) * pos_weight_factor, device=device) # will be broadcasted across 'target axis' i.e. any axis of target adjacency matrix
-  print("pos_weights:", pos_weights)"""
-
   criterion = BCEWithLogitsLoss_masked(weight_1s=weight_1s)
-  criterion_dev = BCEWithLogitsLoss_masked()
+  # criterion_dev = BCEWithLogitsLoss_masked()
 
 
   while not breaking_condition_met: # turn until some breaking condition is met (patience ran out or max_num_epochs is met)
@@ -220,65 +229,56 @@ def train_model(
     print("---------")
 
     # shuffle the examples (we need to keep track of indices to order Y_train accordingly)
-    indices = list(range(len(X_train)))
-    shuffle(indices)
-    X_train = [X_train[i] for i in indices]
+    with torch.no_grad():
 
-    # apply the same to target matrices
-    indices_tensor = torch.tensor(indices)
-    Y_train = Y_train[indices_tensor]
-    mask[indices_tensor]
+      indices = list(range(len(X_train)))
+      shuffle(indices)
+      X_train = [X_train[i] for i in indices]
 
-    # getting predictions on dev set
-    dev_pred = model.predict(X_dev)
+      # apply the same to target matrices
+      indices_tensor = torch.tensor(indices)
+      Y_train = Y_train[indices_tensor]
+      mask[indices_tensor]
 
-    #  # calculate the accuracy on dev set (subset)
-    print("shape pred:", dev_pred.shape)
-    print("shape Y:", Y_dev.shape)
-    accuracy = mtrx_accuracy(dev_pred, Y_dev, dev_sent_lengths)
-    recall = mtrx_recall(dev_pred, Y_dev, dev_lengths)
-    precision = mtrx_precision(dev_pred, Y_dev, dev_lengths)
-    fscore = mtrx_fscore(dev_pred, Y_dev, dev_lengths)
+      # getting predictions on dev set
+      dev_pred = model.predict(X_dev)
 
-    print(f"Total accuracy on dev set: {(accuracy * 100):.2f}%")
-    print(f"Recall on dev set: {(recall * 100):.2f}%")
-    print(f"Precision on dev set: {(precision * 100):.2f}%")
-    print(f"Fscore on dev set: {(fscore * 100):.2f}%")
-    print(f"loss on last epoch: {loss}")
-    print(f"normalized loss last epoch {norm_loss}")
+      # calculate the accuracy on dev set (subset)
+      accuracy = mtrx_accuracy(dev_pred, Y_dev, dev_lengths)
+      recall = mtrx_recall(dev_pred, Y_dev, dev_lengths)
+      precision = mtrx_precision(dev_pred, Y_dev, dev_lengths)
+      fscore = mtrx_fscore(dev_pred, Y_dev, dev_lengths)
 
-    print("---------")
-    del dev_pred
+      print(f"Total accuracy on dev set: {(accuracy * 100):.2f}%")
+      print(f"Recall on dev set: {(recall * 100):.2f}%")
+      print(f"Precision on dev set: {(precision * 100):.2f}%")
+      print(f"Fscore on dev set: {(fscore * 100):.2f}%")
+      print(f"loss on last epoch: {loss}")
+      print(f"normalized loss last epoch {norm_loss}")
 
-    # calculate the accuracy on (subset of) train set
 
-    """train_pred = torch.round(torch.sigmoid(model(X_train[:100]))).to(device)
-    Y_train_trunc = Y_train[:, :train_pred.size(1), :train_pred.size(2)]
-    recall, precision, fscore = mtrx_accuracy(train_pred, Y_train_trunc[:100], get_sentence_lengths(X_train[:100]).to(device))
-    print("recall on train set:", round(recall, 2) * 100, "%")
-    print("precision on train set:", round(precision, 2) * 100, "%")
-    print("fscore on train set:", round(fscore, 4), "/ 1.0")
-    print("---------")
-    del train_pred"""
+      print("---------")
+      del dev_pred # , train_pred
 
-    # check if patience needs to be decreased (when accuracy on dev set decreased)
-    if fscore_last >= fscore:
-      patience -= 1
-    else:
-      patience = initial_patience
-      # update to the current accuracy
-      fscore_last = fscore
-    print("Patience left:", patience)
-    print("------------------------------------------")
-    print()
+      # check if patience needs to be decreased (when accuracy on dev set decreased)
+      if fscore_last >= fscore:
+        patience -= 1
+      else:
+        patience = initial_patience
+        # update to the current accuracy
+        fscore_last = fscore
+      print("Patience left:", patience)
+      print("------------------------------------------")
+      print()
 
-    # see if a breaking condition applies
-    if not patience or epoch_counter >= max_epochs:
-      breaking_condition_met = True
+      # see if a breaking condition applies
+      if not patience or epoch_counter >= max_epochs:
+        breaking_condition_met = True
 
-    epoch_counter += 1
-    batch_counter = 0
+      epoch_counter += 1
+      batch_counter = 0
 
+    # in this context gradients are computed
     # iterate over batches
     for i in range(0, len(X_train), batch_size):
 
@@ -291,43 +291,35 @@ def train_model(
       # reset gradient for each batch
       model.zero_grad()
 
-      # a batch of size BATCH_SIZE x SEQ_LENGTH (batch of vectorized sentences)
-      X_batch = X_train[i:i+batch_size]
+      with torch.no_grad():
 
-      # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
-      Y_batch = Y_train[i:i+batch_size]
+        # a batch of size BATCH_SIZE x SEQ_LENGTH (batch of vectorized sentences)
+        X_batch = X_train[i:i+batch_size]
 
-      # respective sentence lengths
-      mask_batch = mask[i:i+batch_size]
+        # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
+        Y_batch = Y_train[i:i+batch_size]
+
+        # respective sentence lengths
+        mask_batch = mask[i:i+batch_size]
 
       # the shape of seq length can be changed here (in the biLSTM pass)
-      # (we can sefely truncate Y_train accordingly in this case)
-      logits = model(X_batch)
-      Y_batch = Y_batch[:, :logits.size(1), :logits.size(2)] # will truncate the gold matrices to maximum seq_length in current batch
-      mask_batch = mask_batch[:, :logits.size(1), :logits.size(2)]
+      # (we can safely truncate Y_train accordingly in this case)
+      logits = model(X_batch, is_sorted=False)
+      with torch.no_grad():
+        Y_batch = Y_batch[:, :logits.size(1), :logits.size(2)] # will truncate the gold matrices to maximum seq_length in current batch
+        mask_batch = mask_batch[:, :logits.size(1), :logits.size(2)]
 
       # compute the (masked) loss
       loss = criterion(logits, Y_batch, mask_batch)
       # loss_dev = criterion_dev(logits, Y_batch, mask_batch)
-      norm_loss = loss / mask_batch.sum() # loss relative to the number of candidate arcs in a batch
+      with torch.no_grad():
+        norm_loss = loss / mask_batch.sum() # loss relative to the number of candidate arcs in a batch
 
-      if loss_lst is not None:
-        loss_lst.append(norm_loss)
-
-      """losses_train.append(loss)
-      losses_dev.append(loss_dev)"""
+        if loss_lst is not None:
+          loss_lst.append(norm_loss)
 
       # perform backward propagation to get the gradient wrt parameters
       loss.backward()
-
-      """
-      print("embeddings gradients:", model.embeddings.weight.grad)
-      print("some bilstm gradients:", model.bilstm.all_weights[0][0].grad)
-      print("MLP first layer gradient:", model.MLP_head.w_1.weight.grad)
-      print("MLP second layer gradient:", model.MLP_dep.w_2.weight.grad)
-      print("scorer U matrix grad:", model.scorer.U.grad)
-      """
-
 
       # update the parameters according to leanring rate and calculated gradient
       optimizer.step()
