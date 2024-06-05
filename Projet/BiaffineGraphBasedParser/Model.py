@@ -8,10 +8,84 @@ import torch.nn.init as init
 
 # CONVENTIONS
 # SEQ_LENGTH (or SEQUENCE_LENGTH) is the uniform length of (padded) sentences in a batch
-# d is the number of dimension of every word vector after MLP split
-# e is the number of dimensions of every word vector before MLP split
-# BATCH_SIZE is the number of sentences
-# when using einsum we use the same letter in large and small caps when referring to axis of same length, e.g. s and S may refer to SEQ_LENGTH axis
+
+# 3 functions which deal with converting lists of lists of sentences wplit into words into tensors containing contextual BERT representations of a sentence
+# Subtokenization is dealt with by retaining the first subtoken of a word, 
+# disgregarding the other subtokens of a word and then contracting the sequence
+
+def contract_single_sequence(sequence, word_ids):
+    '''
+    sequence: torch.tensor of shape [1, UNCONTRACTED_MAX_LENGTH, 768]
+    word_ids: list of length of tokenized sequence
+    '''
+
+    with torch.no_grad():
+
+      if len(word_ids) == len(set(word_ids)):  # case of no sub word tokenization
+          return sequence[:, :len(word_ids)]  # return a tensor of shape [1 X SEQ_LENGTH X 768]
+
+      unique_word_ids = list(set(word_ids))
+      contracted_out = torch.zeros((1, len(unique_word_ids), 768), device=sequence.device)  # match device
+
+      unique_index = 0  # separate index for contracted_out
+      seen_word_ids = set()
+      for idx, word_id in enumerate(word_ids):
+          if word_id not in seen_word_ids:
+              seen_word_ids.add(word_id)
+              contracted_out[0, unique_index, :] = sequence[0, idx, :]
+              unique_index += 1
+
+      return contracted_out
+
+def contract_batch(tokenizer_out, model_out):
+    '''
+    tokenizer_out: output of Bert Fast tokenizer, i.e. list containing dictionaries with keys 'input_ids', 'token_type_ids', 'attention_mask'
+    model_out: output of Bert Fast model, i.e. list containing each contextualized encoding of a sentence
+    '''
+    with torch.no_grad():
+
+      word_ids = [example.word_ids() for example in tokenizer_out]  # list containing lists, i.e. mappings from subword_token indices to full word indices in original sentence
+      seq_lengths = torch.tensor(list(map(lambda x: len(set(x)), word_ids)), dtype=torch.int)  # seq_lengths after removing duplicates
+      max_length = seq_lengths.max()  # maximum length
+      contracted_batch = torch.zeros((len(tokenizer_out), max_length, 768), device=model_out[0].last_hidden_state.device)  # tensor of shape [BATCH_SIZE X SEQ_LENGTH X BERT_EMBEDDINGS_SIZE=768]
+
+      for idx, example in enumerate(model_out):
+          tensor = example.last_hidden_state
+          contracted_batch[idx, :seq_lengths[idx], :] = contract_single_sequence(tensor, word_ids[idx])
+
+      return contracted_batch
+
+
+def get_and_contract_BERT(model, tokenizer, input):
+  '''
+  model: the BERT model used to compute contextualized embeddings (linked to tokenizer)
+  tokenizer: the tokenizer used to extract word ids (linked to model)
+  input: a list of lists of sentences containing words
+  max_length: the upper bound for lengths of sentences s.t. they will be considered
+  '''
+
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+  model = model.to(device) # move model to gpu if possible
+
+  tokenizer_out = list(map(lambda sent: tokenizer(sent[1:], add_special_tokens=False, is_split_into_words=True, return_tensors='pt').to(device),
+                          input))
+
+  model_out = list(map(lambda inputs: model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]), tokenizer_out))
+
+  pad_id = torch.tensor([[tokenizer.pad_token_id]], device=device) # used to pad output in the end
+
+  with torch.no_grad():
+    outputs = model(pad_id)
+    padding_embedding = outputs.last_hidden_state[0, 0, :]
+
+    # c.f. contract_batch
+    out = contract_batch(tokenizer_out, model_out)
+    mask = (out.sum(dim=-1) == 0) # indices of encodings which are paddings
+    out[mask] = padding_embedding # fill out with the padding embedding
+
+  return out
+
 
 # this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
