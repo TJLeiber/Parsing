@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from transformers.models.distilbert.modeling_distilbert import Embeddings
+from transformers import AutoTokenizer, BertModel
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.init as init
 
@@ -34,7 +34,7 @@ class Biaffine(nn.Module):
         # a single vector of adequate size to return a scalar for W.(concat(v, u))
         self.W = nn.Parameter(torch.zeros(2 * d + 1))  # [2*d]
 
-    def forward(self, H, D):
+    def forward(self, D, H):
         '''
         :param H: A tensor containing head representations of words size [BATCH_SIZE x SEQ_LENGTH x d]
         :param D: A tensor containing dependent representations of words size [BATCH_SIZE x SEQ_LENGTH x d]
@@ -47,7 +47,7 @@ class Biaffine(nn.Module):
         # for integrated bias concatenate ones along the word encoding axis of the heads matrix H
         ones = torch.ones(H.size(0), H.size(1), 1, device=self.U.device)
         H = torch.cat((H, ones), dim=2) # get a one
-        U_product = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+        U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
@@ -79,10 +79,11 @@ class SimpleBiaffine(nn.Module):
 
         # a d x d matrix to return a scalar for v.U.u
         self.U = nn.Parameter(torch.Tensor(d + 1, d))  # [d + 1 x d + 1] (d + 1 integrated bias)
-        init.zeros_(self.U)
+        init.xavier_normal_(self.U)
+        # init.zeros_(self.U)
 
 
-    def forward(self, H, D):
+    def forward(self, D, H):
         '''
         :param H: A tensor containing heads representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
         :param D: A tensor containing dependent representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
@@ -92,12 +93,13 @@ class SimpleBiaffine(nn.Module):
         # Recall --> SimpleBiaffine(v, u) := v.U.u + b
 
         # integrate bias
-        ones = torch.ones(H.size(0), H.size(1), 1, device=self.U.device) # H and D have the same size, hence 'ones' can be reused
-        H = torch.cat((H, ones), dim=2) # add bias
+        ones = torch.ones(D.size(0), D.size(1), 1, device=self.U.device) # H and D have the same size, hence 'ones' can be reused
+        D = torch.cat((D, ones), dim=2) # add bias
         # D = torch.cat((D, ones), dim=2) # add bias
 
+
         # -------------------- v.U.u --------------------
-        U_product = torch.einsum("bxi,ij,byj->bxy", H, self.U, D)  # [BATCH_SIZE x NB_CLASSES x SEQ_LENGTH x SEQ_LENGTH]
+        U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x NB_CLASSES x SEQ_LENGTH x SEQ_LENGTH]
         # U_product.squeeze(1) # we only have one output class
 
         return U_product
@@ -117,7 +119,7 @@ class Bilinear(nn.Module):
         # a d x d matrix to return a scalar for v.U.u
         self.U = nn.Parameter(torch.zeros(d, d))  # [d x d]
 
-    def forward(self, H, D):
+    def forward(self, D, H):
         '''
         :param H: A tensor containing heads representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
         :param D: A tensor containing dependent representation of words size [BATCH_SIZE x SEQ_LENGTH x d]
@@ -125,7 +127,7 @@ class Bilinear(nn.Module):
         '''
 
         # v.U.u
-        out = torch.einsum("bsd, tT, bSD-> bSs", H, self.U, D)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
+        out = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         return out
 
@@ -176,12 +178,12 @@ class SplitMLP(nn.Module):
 
 class GraphBasedParser(nn.Module):
 
-    def __init__(self, MLP_hidden_layer=600, d=600, embed="pretrained", vocab=None, POS_Embeddings=False, scorer="SimpleBiaffine"):
+    def __init__(self, MLP_hidden_layer=600, d=600, embed="static", vocab=None, POS_Embeddings=False, scorer="SimpleBiaffine"):
         super(GraphBasedParser, self).__init__()
 
         # initialize embeddings
         if embed=="static":
-          self.embed = "pretrained"
+          self.embed = "static"
           print("loading pretrained embeddings...")
           glove = GloVe()
           self.embeddings = nn.Embedding.from_pretrained(glove.weights, freeze=False) # glove.weights returns a tensor of size [|V| x EMBEDDINGS_DIM]
@@ -195,12 +197,18 @@ class GraphBasedParser(nn.Module):
           self.vocab = vocab
           self.w2i = get_w2i(self.vocab)
         elif embed == "contextual":
-          pass
+          self.embed="contextual"
+          self.bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")  # automatically yields FastTokenizer if possible
+          self.bert_model = BertModel.from_pretrained("bert-base-uncased")  # loading respective BERT model
+          print("BERT model and tokenizer loaded!")
         else:
           raise ValueError("Invalid kwarg for 'embed'. Must choose 'static', 'contextual' or 'scratch'.")
 
         # initialize biLSTM
-        self.bilstm = nn.LSTM(self.embeddings.weight.shape[1], hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33)
+        if self.embed == "contextual":
+          self.bilstm = nn.LSTM(768, hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33) # need to manually set size input dim to BERT size
+        else:
+          self.bilstm = nn.LSTM(self.embeddings.weight.shape[1], hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33)
 
         # initialize two MLPs which yield head and dependent representations
         self.MLP_head = SplitMLP(bilstm_hidden_size=d * 2, hidden_dim=d, output_dim=d, dropout=0.33)
@@ -215,36 +223,41 @@ class GraphBasedParser(nn.Module):
         elif scorer == "Bilinear":
             self.scorer = Bilinear(d)
         else:
-          raise ValueError("Incorrect kwarg. Please choose scorer= 'Biaffine', 'SimpleBiaffine', or 'Bilinear'. Default is 'SimpleBiaffine'")
+          raise ValueError("Invalid kwarg. Please choose scorer= 'Biaffine', 'SimpleBiaffine', or 'Bilinear'. Default is 'SimpleBiaffine'")
 
 
 
-    def forward(self, X): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
+    def forward(self, X, is_sorted=False): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
 
         # check cuda
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # step 0: ------------------------------------------SORTING, VECTORIZING AND PADDING------------------------------------------
+        # step 0: ------------------------------------------VECTORIZING AND PADDING------------------------------------------
 
-        # retrieving original order on sentences and sorting them deacreasingly by their length
-        sorted_lst_with_idx = sorted(enumerate(X), key=lambda x: -len(x[1]))
-        sorted_X = [x[1] for x in sorted_lst_with_idx]
-        original_ordering = torch.tensor([x[0] for x in sorted_lst_with_idx], device=device)
 
         # get seq lengths tensor of size [BATCH_SIZE]
-        X_lengths = get_sentence_lengths(sorted_X)
+        if self.embed == "contextual":
+          X_lengths = get_sentence_lengths(X, include_root=False) # subtract a one beacuse root token has no BERT representation (i.e. sequence lengths are - 1 in length)
+        else:
+          X_lengths = get_sentence_lengths(X, include_root=True)
+
         X_lengths = X_lengths.to(device)
         # print(X_lengths)
         # vectorizing sorted sentences
-        vectorized_X = vectorize(sorted_X, self.w2i)
 
         # padding vectorized sequences
-        if self.embed == "pretrained":
+        if self.embed == "static":
+          vectorized_X = vectorize(X, self.w2i)
           vectorized_X = pad_vect_sentences(vectorized_X, self.w2i)
+          vectorized_X = vectorized_X.to(device)
         elif self.embed == "scratch":
+          vectorized_X = vectorize(X, self.w2i)
           vectorized_X = pad_vect_sentences(vectorized_X, get_w2i(self.vocab))
+          vectorized_X = vectorized_X.to(device)
 
-        vectorized_X = vectorized_X.to(device)
+        # needs to be placed out of no_grad context because self attention is computed in this function (contains no_grad when necessary inside of function)
+        if self.embed == "contextual":
+            X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X) # returns padded sequence representations
 
 
 
@@ -252,21 +265,25 @@ class GraphBasedParser(nn.Module):
 
         # tensor of size [BACTH_SIZE x SEQ_LENGTH x EMBED_SIZE]
         # no need to sort in decreasing order since the examples were already sorted in the very beginning to allow mapping to Y_train, i.e. adjacency matrices
-        X = self.embeddings(vectorized_X)
+        if self.embed == "static" or self.embed == "scratch":
+          X = self.embeddings(vectorized_X)
 
         # packed X_train of size [batch_sum_seq_len X EMBEDDINGS_SIZE] --> used for biLSTM encoding only
-        X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=True, batch_first=True)
+        if is_sorted:
+          X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=True, batch_first=True)
+        else: # i.e. if the input is not sorted decreasingly according to length
+          X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=False, batch_first=True)
         X = X.to(device)
         # sizes ...
         X_encoded, (ht, ct) = self.bilstm(X)
         del ht, ct # not needed
 
-        # unpack X_Train packed (This sequence can change the size of the sequence length depending on MAX_LENGTH in sent_lengths)
-        X_encoded, input_sizes = pad_packed_sequence(X_encoded, batch_first=True)
+        # Assuming `X_encoded` is the PackedSequence object from the BiLSTM
+        # Unpack the sequences
+        X_encoded, input_sizes_padded = pad_packed_sequence(X_encoded, batch_first=True)
 
-        # step 1.5 ------------------------------------------restoring initial order of batch------------------------------------------
-        X_encoded = X_encoded[original_ordering].to(device)
-        X_lengths = X_lengths[original_ordering].to(device)
+        X_encoded = X_encoded.to(device) # move to GPU if available
+        X_lengths = X_lengths.to(device)
 
         # step 2: ------------------------------------------SPLITTING LAST RECURRENT STATE (HEAD & DEP)------------------------------------------
         # split recurrent states
@@ -274,15 +291,7 @@ class GraphBasedParser(nn.Module):
         deps = self.MLP_dep(X_encoded)
 
         # step 3: -------------------------------------------SCORING CANDIDATE ARCS------------------------------------------
-        out = self.scorer(heads, deps)
-
-        # we ignore edges involving pad tokens by multipyling them with zero
-        # --> done via elementwise multiplication with a mask tensor
-        """
-        mask = get_mask(out, X_lengths)
-        mask = mask.to(out.device)
-        out = out * mask
-        """
+        out = self.scorer(deps, heads)
 
         return out
 
@@ -293,3 +302,13 @@ class GraphBasedParser(nn.Module):
       with torch.no_grad():
         pred = torch.round(torch.sigmoid(self.forward(X)))
       return pred
+
+    def serialize(self, file_path):
+      '''
+      method which saves the current model to file_path
+      '''
+
+      try:
+        torch.save(self, file_path)
+      except Exception as e:
+        print(f'An error occurred while saving the model: {e}')
