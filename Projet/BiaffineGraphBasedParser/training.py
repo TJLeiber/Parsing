@@ -4,13 +4,13 @@ import torch.optim as optim
 
 # -------------------------------FUNCTION TO RETRIEVE MASK-------------------------------
 def get_mask(examples_tensor, sent_lengths):
-  '''given a tensor of size BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH return a mask tensor containing
+  '''given a tensor of size BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH return a mask tensor containing ones for candidate edges
   '''
 
-  mask = torch.zeros(examples_tensor.shape, dtype=torch.int32)
+  mask = torch.zeros(examples_tensor.shape, dtype=torch.long)
 
   for idx, sent_len in enumerate(sent_lengths):
-    mask[idx, :sent_len, :sent_len] = torch.ones(sent_len, sent_len) # add ones up until the length of the actual sentence
+    mask[idx, :sent_len, :sent_len] = torch.ones(sent_len, sent_len) # add ones up until the length of the actual sentence (including root)
 
   return mask
 
