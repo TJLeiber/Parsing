@@ -9,6 +9,8 @@ import torch.nn.init as init
 # CONVENTIONS
 # SEQ_LENGTH (or SEQUENCE_LENGTH) is the uniform length of (padded) sentences in a batch
 
+
+# ------------------------------------------------------------------- BERT ENCODING AND SUBWORD TOKEN PROBLEM --------------------------------------------------------------
 # 3 functions which deal with converting lists of lists of sentences wplit into words into tensors containing contextual BERT representations of a sentence
 # Subtokenization is dealt with by retaining the first subtoken of a word, 
 # disgregarding the other subtokens of a word and then contracting the sequence
