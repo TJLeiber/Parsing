@@ -371,12 +371,12 @@ class GraphBasedParser(nn.Module):
 
         return out
 
-    def predict(self, X):
+    def predict(self, X, is_sorted=False):
       '''given an input list of lists of sentences return all their adjacency matrices representing semantic relations'''
 
       # take sigmoid over logit and then round
       with torch.no_grad():
-        pred = torch.round(torch.sigmoid(self.forward(X)))
+        pred = torch.round(torch.sigmoid(self.forward(X, is_sorted=is_sorted)))
       return pred
 
     def serialize(self, file_path):
