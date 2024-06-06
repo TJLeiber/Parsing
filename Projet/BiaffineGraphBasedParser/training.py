@@ -174,7 +174,8 @@ def train_model(
     scheduled=False,
     weight_1s=1, # weight attached to loss w.r.t. predictions concerning existing arcs
     loss_lst = None, # when a list is passed it will be filled with the computed losses
-    sort_batches=False # when set to True, batches are sorted in decreasing order of their length each time. Default is False
+    sort_batches=False, # when set to True, batches are sorted in decreasing order of their length each time. Default is False
+    learn_root=True # set to True means that root predictions will be included in learning
     ):
 
   '''implementation of a training algorithm to update parameters of a model'''
@@ -194,9 +195,9 @@ def train_model(
 
   Y_dev = Y_dev.to(device)
   Y_train = Y_train.to(device)
-  train_lengths = get_sentence_lengths(X_train, include_root=True).to(device)
+  train_lengths = get_sentence_lengths(X_train, include_root=learn_root).to(device)
   mask = get_mask(Y_train, train_lengths).to(device) # will be used to only consider loss for real candidate arcs
-  dev_lengths = get_sentence_lengths(X_dev, include_root=True).to(device)
+  dev_lengths = get_sentence_lengths(X_dev, include_root=learn_root).to(device)
 
   if torch.cuda.is_available():
     print("moved model to GPU")
@@ -293,18 +294,36 @@ def train_model(
 
       with torch.no_grad():
 
-        # a batch of size BATCH_SIZE x SEQ_LENGTH (batch of vectorized sentences)
+        # a batch of sentences split into words list of lists of words preceded by root token 
+        # [['<ROOT>', 'this', 'is', 'a', 'sentence'], ['<ROOT>',...], ...]
         X_batch = X_train[i:i+batch_size]
 
-        # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH y SEQ_LENGTH
+        if sort_batches:
+          # sorted(list(enumerate(X_batch)), key=lambda x: -len(x[1])) gives a list containing example_idx, sentence pairs ordered decreasingly by length
+          sorted_idx_sentence_lst = sorted(list(enumerate(X_batch)), key=lambda x: -len(x[1]))
+
+          # X_batch_idx the only contains the original idx of a sentence at the position of the sentence in the ordered list
+          X_batch_idx = [idx for idx, sentence in sorted_idx_sentence_lst]
+          # X_batch is now sorted decreasingly by length
+          X_batch = [sentence for idx, sentence in sorted_idx_sentence_lst]
+
+          # ordering needed for target and mask tensor
+          ordering = torch.tensor(X_batch_idx).to(device)
+
+        # target adjacency matrix batch of shape BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH
         Y_batch = Y_train[i:i+batch_size]
+        if sort_batches:
+          Y_batch = Y_batch[ordering] # sort targets as X_batch has been sorted
 
         # respective sentence lengths
+        # a tensor of shape [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH] containing 1s for all relevant predictions and 0s for all irrelevant ones
         mask_batch = mask[i:i+batch_size]
+        if sort_batches:
+          mask_batch = mask[ordering]
 
       # the shape of seq length can be changed here (in the biLSTM pass)
       # (we can safely truncate Y_train accordingly in this case)
-      logits = model(X_batch, is_sorted=False)
+      logits = model(X_batch, is_sorted=sort_batches, include_root=learn_root) # deafault settings for forward
       with torch.no_grad():
         Y_batch = Y_batch[:, :logits.size(1), :logits.size(2)] # will truncate the gold matrices to maximum seq_length in current batch
         mask_batch = mask_batch[:, :logits.size(1), :logits.size(2)]
