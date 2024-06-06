@@ -15,31 +15,34 @@ import torch.nn.init as init
 # Subtokenization is dealt with by retaining the first subtoken of a word, 
 # disgregarding the other subtokens of a word and then contracting the sequence
 
-def contract_single_sequence(sequence, word_ids):
+def contract_single_sequence(sequence, word_ids, max_length):
     '''
     sequence: torch.tensor of shape [1, UNCONTRACTED_MAX_LENGTH, 768]
     word_ids: list of length of tokenized sequence
+    max_length: length of each padded sequence before tokenization c.f. contract_batch and get_and_contract_BERT functions
     '''
+
+    # note that the number of unique word_ids is already given by max_length, i.e. the length of every padded sequence in the batch before tokenization
 
     with torch.no_grad():
 
-      if len(word_ids) == len(set(word_ids)):  # case of no sub word tokenization
-          return sequence[:, :len(word_ids)]  # return a tensor of shape [1 X SEQ_LENGTH X 768]
+      if len(word_ids) == max_length: # case of no sub word tokenization in a sequence
+          return sequence # return a tensor of shape [1 X SEQ_LENGTH X 768]
 
-      unique_word_ids = list(set(word_ids))
-      contracted_out = torch.zeros((1, len(unique_word_ids), 768), device=sequence.device)  # match device
+      # unique_word_ids = list(set(word_ids))
+      contracted_out = torch.empty((1, max_length, 768), device=sequence.device)  # match device # alternatively len(unique_word_ids) instead of max_length
 
       unique_index = 0  # separate index for contracted_out
       seen_word_ids = set()
       for idx, word_id in enumerate(word_ids):
           if word_id not in seen_word_ids:
-              seen_word_ids.add(word_id)
+              seen_word_ids.add(word_id) # add to seen ids to skip at next iteration(s)
               contracted_out[0, unique_index, :] = sequence[0, idx, :]
               unique_index += 1
 
       return contracted_out
 
-def contract_batch(tokenizer_out, model_out):
+def contract_batch(tokenizer_out, model_out, max_length):
     '''
     tokenizer_out: output of Bert Fast tokenizer, i.e. list containing dictionaries with keys 'input_ids', 'token_type_ids', 'attention_mask'
     model_out: output of Bert Fast model, i.e. list containing each contextualized encoding of a sentence
@@ -47,18 +50,17 @@ def contract_batch(tokenizer_out, model_out):
     with torch.no_grad():
 
       word_ids = [example.word_ids() for example in tokenizer_out]  # list containing lists, i.e. mappings from subword_token indices to full word indices in original sentence
-      seq_lengths = torch.tensor(list(map(lambda x: len(set(x)), word_ids)), dtype=torch.int)  # seq_lengths after removing duplicates
-      max_length = seq_lengths.max()  # maximum length
-      contracted_batch = torch.zeros((len(tokenizer_out), max_length, 768), device=model_out[0].last_hidden_state.device)  # tensor of shape [BATCH_SIZE X SEQ_LENGTH X BERT_EMBEDDINGS_SIZE=768]
+      # tensor to be filled with batch of sequences [BATCH_SIZE x SEQ_LEN x 768]
+      contracted_batch = torch.empty((len(tokenizer_out), max_length, 768), device=model_out[0].last_hidden_state.device)
 
       for idx, example in enumerate(model_out):
           tensor = example.last_hidden_state
-          contracted_batch[idx, :seq_lengths[idx], :] = contract_single_sequence(tensor, word_ids[idx])
+          contracted_batch[idx] = contract_single_sequence(tensor, word_ids[idx], max_length=max_length)
 
       return contracted_batch
 
 
-def get_and_contract_BERT(model, tokenizer, input):
+def get_and_contract_BERT(model, tokenizer, input, include_root=True):
   '''
   model: the BERT model used to compute contextualized embeddings (linked to tokenizer)
   tokenizer: the tokenizer used to extract word ids (linked to model)
@@ -70,21 +72,32 @@ def get_and_contract_BERT(model, tokenizer, input):
 
   model = model.to(device) # move model to gpu if possible
 
-  tokenizer_out = list(map(lambda sent: tokenizer(sent[1:], add_special_tokens=False, is_split_into_words=True, return_tensors='pt').to(device),
-                          input))
+  max_length = len(max(input, key=len)) # length of the lingest sequence in the batch (used for padding)
 
-  model_out = list(map(lambda inputs: model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]), tokenizer_out))
+  if include_root: # if we include root predictions
+    tokenizer_out = list( # create a list...
+                          map( # of the iterator obtained by applying the following lambda function to 'input' parameter
+                              lambda sent: tokenizer(sent + ['[PAD]' for i in range(max_length - len(sent)) if len(sent) < max_length], # note that '<ROOT>' will play the role of the CLS token c.f. BiaffineGraphBasedParser constructor
+                                                    add_special_tokens=False,
+                                                    is_split_into_words=True,
+                                                    return_tensors='pt'
+                                                    ).to(device), # need to move tensor because by default py tensors are move to the cpu by tokenizer
+                              input)) # in this case we set <ROOT> to be the CLS token, since <ROOT> is always included in the input
+  else:
+    max_length = max_length - 1 # note that not including root takes one off the maximum length sequences will be padded to
+    tokenizer_out = list(# create a list...
+                          map(# of the iterator obtained by applying the following lambda function to 'input' parameter
+                              lambda sent: tokenizer(sent[1:] + ['[PAD]' for i in range(max_length - len(sent)) if len(sent) < max_length], # sent[1:] removes '<ROOT>' token
+                                                     add_special_tokens=False,
+                                                     is_split_into_words=True,
+                                                     return_tensors='pt'
+                                                     ).to(device), # need to move tensor because by default py tensors are move to the cpu by tokenizer
+                              input)) # in this case we do not predict root token. Note that this requires setting include_root to false when preparing the data
 
-  pad_id = torch.tensor([[tokenizer.pad_token_id]], device=device) # used to pad output in the end
+  model_out = list(map(lambda inputs: model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]), tokenizer_out)) # list of padded sequence representations
 
-  with torch.no_grad():
-    outputs = model(pad_id)
-    padding_embedding = outputs.last_hidden_state[0, 0, :]
-
-    # c.f. contract_batch
-    out = contract_batch(tokenizer_out, model_out)
-    mask = (out.sum(dim=-1) == 0) # indices of encodings which are paddings
-    out[mask] = padding_embedding # fill out with the padding embedding
+  # [BATCH_SIZE x MAX_LENGTH x 768]
+  out = contract_batch(tokenizer_out, model_out, max_length=max_length) # contract all sequences only retaining first token in case of subwordtokens cf. other contract functions
 
   return out
 
@@ -275,7 +288,12 @@ class GraphBasedParser(nn.Module):
         elif embed == "contextual":
           self.embed="contextual"
           self.bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")  # automatically yields FastTokenizer if possible
+
+          # self.bert_tokenizer.cls_token='<ROOT>' # cls token will be used to predict <ROOT>
+
+          self.bert_tokenizer.add_tokens('<ROOT>', special_tokens=True) # add root token as a special token
           self.bert_model = BertModel.from_pretrained("bert-base-uncased")  # loading respective BERT model
+          self.bert_model.resize_token_embeddings(len(self.bert_tokenizer)) # since we added root token
           print("BERT model and tokenizer loaded!")
         else:
           raise ValueError("Invalid kwarg for 'embed'. Must choose 'static', 'contextual' or 'scratch'.")
@@ -303,7 +321,7 @@ class GraphBasedParser(nn.Module):
 
 
 
-    def forward(self, X, is_sorted=False): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
+    def forward(self, X, is_sorted=False, include_root=True): # vectorization/sent_lengths for dm dataset is provided in preprocessing file
 
         # check cuda
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -312,14 +330,10 @@ class GraphBasedParser(nn.Module):
 
 
         # get seq lengths tensor of size [BATCH_SIZE]
-        if self.embed == "contextual":
-          X_lengths = get_sentence_lengths(X, include_root=False) # subtract a one beacuse root token has no BERT representation (i.e. sequence lengths are - 1 in length)
+        if include_root:
+          X_lengths = get_sentence_lengths(X, include_root=True).to(device)
         else:
-          X_lengths = get_sentence_lengths(X, include_root=True)
-
-        X_lengths = X_lengths.to(device)
-        # print(X_lengths)
-        # vectorizing sorted sentences
+          X_lengths = get_sentence_lengths(X, include_root=False).to(device)
 
         # padding vectorized sequences
         if self.embed == "static":
@@ -332,8 +346,11 @@ class GraphBasedParser(nn.Module):
           vectorized_X = vectorized_X.to(device)
 
         # needs to be placed out of no_grad context because self attention is computed in this function (contains no_grad when necessary inside of function)
-        if self.embed == "contextual":
-            X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X) # returns padded sequence representations
+        if self.embed == "contextual" and include_root:
+          X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X) # returns padded sequence representations
+        elif self.embed == "contextual" and not include_root:
+          X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X)
+
 
 
 
@@ -345,10 +362,7 @@ class GraphBasedParser(nn.Module):
           X = self.embeddings(vectorized_X)
 
         # packed X_train of size [batch_sum_seq_len X EMBEDDINGS_SIZE] --> used for biLSTM encoding only
-        if is_sorted:
-          X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=True, batch_first=True)
-        else: # i.e. if the input is not sorted decreasingly according to length
-          X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=False, batch_first=True)
+        X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=is_sorted, batch_first=True)
         X = X.to(device)
         # sizes ...
         X_encoded, (ht, ct) = self.bilstm(X)
@@ -371,12 +385,12 @@ class GraphBasedParser(nn.Module):
 
         return out
 
-    def predict(self, X, is_sorted=False):
+    def predict(self, X):
       '''given an input list of lists of sentences return all their adjacency matrices representing semantic relations'''
 
       # take sigmoid over logit and then round
       with torch.no_grad():
-        pred = torch.round(torch.sigmoid(self.forward(X, is_sorted=is_sorted)))
+        pred = torch.round(torch.sigmoid(self.forward(X)))
       return pred
 
     def serialize(self, file_path):
