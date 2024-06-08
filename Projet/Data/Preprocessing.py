@@ -4,6 +4,14 @@ import pandas as pd
 import torch
 
 def get_dm_adj_mtrx(df, seq_length, include_root=True):
+  '''
+  given a dataframe organized in dm dataset fashion, the maximum length the sentence ought to be padded to,
+  output the adjacency matrix representing semantic dependencies
+  
+  df: dataframe from dm data set
+  seq_length: maximum length the sentence ought to be padded to
+  include_root: boolean kwarg indicating whether root will be included in adjacency matrix or not
+  '''
 
   # adjacency matrix as torch tensor of size [seq_length x seq_length]
   adj_mtrx = torch.zeros(seq_length, seq_length)
