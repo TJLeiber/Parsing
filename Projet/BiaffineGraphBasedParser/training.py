@@ -208,7 +208,7 @@ def train_model(
     weight_1s=1, # weight attached to loss w.r.t. predictions concerning existing arcs
     loss_lst = None, # when a list is passed it will be filled with the computed losses
     sort_batches=False, # when set to True, batches are sorted in decreasing order of their length each time. Default is False
-    learn_root=True # set to True means that root predictions will be included in learning
+    learn_root=True
     ):
 
   '''implementation of a training algorithm to update parameters of a model'''
@@ -327,7 +327,7 @@ def train_model(
 
       with torch.no_grad():
 
-        # a batch of sentences split into words list of lists of words preceded by root token 
+        # a batch of sentences split into words list of lists of words preceded by root token
         # [['<ROOT>', 'this', 'is', 'a', 'sentence'], ['<ROOT>',...], ...]
         X_batch = X_train[i:i+batch_size]
 
