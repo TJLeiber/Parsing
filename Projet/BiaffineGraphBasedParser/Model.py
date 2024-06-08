@@ -102,7 +102,6 @@ def get_and_contract_BERT(model, tokenizer, input, include_root=True):
   return out
 
 
-# this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
     '''
     biaffine scorer --> used to compute v.U.u + W.(concat(v, u)) + b
@@ -118,10 +117,12 @@ class Biaffine(nn.Module):
         # --> Biaffine(v, u) := v.U.u + W.(concat(v, u)) + b
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.zeros(d + 1, d))  # [d + 1 x d] + 1 for integrated bias
+        self.U = nn.Parameter(torch.empty(d + 1, d))  # [d + 1 x d] + 1 for integrated bias
+        init.xavier_normal_(self.U)
 
         # a single vector of adequate size to return a scalar for W.(concat(v, u))
-        self.W = nn.Parameter(torch.zeros(2 * d + 1))  # [2*d]
+        self.W = nn.Parameter(torch.empty(2 * d + 1))  # [2*d]
+        init.zeros_(self.W)
 
     def forward(self, D, H):
         '''
@@ -134,19 +135,19 @@ class Biaffine(nn.Module):
         # -------------------- v.U.u --------------------
 
         # for integrated bias concatenate ones along the word encoding axis of the heads matrix H
-        ones = torch.ones(H.size(0), H.size(1), 1, device=self.U.device)
-        H = torch.cat((H, ones), dim=2) # get a one
+        ones = torch.ones(D.size(0), D.size(1), 1, device=self.U.device)
+        D = torch.cat((D, ones), dim=2) # get a one
         U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         # Expand P and Q to include the necessary dimensions for concatenation
         # -------------------- W.(concat(v, u)) --------------------
         # we want a tensor of size [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH x d] to access all head-dep concatenations in a given sentence
-        H_expanded = H.unsqueeze(2).expand(-1, -1, D.shape[1], -1)  # H is expanded to [BATCH_SIZE, SEQ_LENGTH, 1, d]
-        D_expanded = D.unsqueeze(1).expand(-1, H.shape[1], -1, -1)  # D to [BATCH_SIZE, 1, SEQ_LENGTH, d]
+        D_expanded = D.unsqueeze(2).expand(-1, -1, H.shape[1], -1)  # H is expanded to [BATCH_SIZE, SEQ_LENGTH, 1, d]
+        H_expanded = H.unsqueeze(1).expand(-1, D.shape[1], -1, -1)  # D to [BATCH_SIZE, 1, SEQ_LENGTH, d]
 
         # Concatenate along the last dimension
         # concat_batch[i, j, k,:]  # will correspond to the concatenation of the dependent word j and head word k at the ith sentence in the batch
-        concat_batch = torch.cat((H_expanded, D_expanded), dim=3)  # Final shape: [BATCH_SIZE, SEQ_LENGTH, SEQ_LENGTH, 2*d]
+        concat_batch = torch.cat((D_expanded, H_expanded), dim=3)  # Final shape: [BATCH_SIZE, SEQ_LENGTH, SEQ_LENGTH, 2*d]
 
         # again we can leverage torch tensor operations by using einsum
         # W_product[i, j, k] is defined as W.(concat(v, u)) at sentence i where v is head repr of word j and u is dep repr of word k
@@ -184,8 +185,6 @@ class SimpleBiaffine(nn.Module):
         # integrate bias
         ones = torch.ones(D.size(0), D.size(1), 1, device=self.U.device) # H and D have the same size, hence 'ones' can be reused
         D = torch.cat((D, ones), dim=2) # add bias
-        # D = torch.cat((D, ones), dim=2) # add bias
-
 
         # -------------------- v.U.u --------------------
         U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x NB_CLASSES x SEQ_LENGTH x SEQ_LENGTH]
@@ -206,7 +205,8 @@ class Bilinear(nn.Module):
         # --> Bilinear(v, u) := v.U.u
 
         # a d x d matrix to return a scalar for v.U.u
-        self.U = nn.Parameter(torch.zeros(d, d))  # [d x d]
+        self.U = nn.Parameter(torch.empty(d, d))  # [d x d]
+        init.xavier_normal_(self.U)
 
     def forward(self, D, H):
         '''
@@ -246,10 +246,6 @@ class SplitMLP(nn.Module):
           device = torch.device("cuda")
         else:
           device = torch.device("cpu")
-
-        # integrate bias ones [BATCH_SIZE, SEQ_LENGTH, 1]
-        # ones = torch.ones(biLSTM_layer.shape[0], biLSTM_layer.shape[1], 1, device=biLSTM_layer.device)
-        # biLSTM_layer = torch.cat((biLSTM_layer, ones), -1) # concatenate along the last dimension
 
         # first linear transformation
         out = self.w_1(biLSTM_layer)
@@ -383,15 +379,15 @@ class GraphBasedParser(nn.Module):
         # step 3: -------------------------------------------SCORING CANDIDATE ARCS------------------------------------------
         out = self.scorer(deps, heads)
 
-        return out
+        return out # outputs logits
 
-    def predict(self, X):
+    def predict(self, X, is_sorted=False, include_root=True):
       '''given an input list of lists of sentences return all their adjacency matrices representing semantic relations'''
 
       # take sigmoid over logit and then round
       with torch.no_grad():
-        pred = torch.round(torch.sigmoid(self.forward(X)))
-      return pred
+        pred = torch.round(torch.sigmoid(self.forward(X, is_sorted=is_sorted, include_root=include_root)))
+      return pred # outputs rounded probabilities, i.e. 1 or 0
 
     def serialize(self, file_path):
       '''
