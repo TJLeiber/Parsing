@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import math
+from statistics import mean
 from random import shuffle
 
 # -------------------------------FUNCTION TO RETRIEVE MASK-------------------------------
@@ -155,6 +156,38 @@ def mtrx_fscore(pred, target, seq_lengths):
     fscore = safe_divide((2*precision * recall), (precision + recall))
 
   return fscore
+
+def evaluate_model(model, X_test, Y_test, test_lengths, batch_size='default'):
+  '''
+  given a model a test set and sequence lengths of examples prints the overall accuracy and precision/recall/fscore w.r.t. 1s predictions
+  model: GraphBasedParser object
+  X_test: list of lists of sentences split into words preceded by '<ROOT>'
+  Y_test: tensor of shape [BATCH_SIZE x SEQ_LEN x SEQ_LEN] containing target edges on semantic dependency graph 
+  --> (batch of padded adjacency matrices)
+  test_lengths: tensor of shape [BATCH_SIZE] containing sequence lengths
+  '''
+    accs, precs, recs, fscs = [], [], [], []
+    if batch_size == 'default':
+      batch_size = len(X_test)
+
+    for i in range(0, len(X_test), batch_size):
+        pred = model.predict(X_test[i:i+batch_size])
+        max_len = test_lengths[i:i+batch_size].max()
+
+        accs.append(mtrx_accuracy(pred, Y_test[i:i+batch_size, :max_len, :max_len], test_lengths[i:i+batch_size]))
+        precs.append(mtrx_precision(pred, Y_test[i:i+batch_size, :max_len, :max_len], test_lengths[i:i+batch_size]))
+        recs.append(mtrx_recall(pred, Y_test[i:i+batch_size, :max_len, :max_len], test_lengths[i:i+batch_size]))
+        fscs.append(mtrx_fscore(pred, Y_test[i:i+batch_size, :max_len, :max_len], test_lengths[i:i+batch_size]))
+
+    mean_acc = mean(accs) * 100
+    mean_prec = mean(precs) * 100
+    mean_rec = mean(recs) * 100
+    mean_fsc = mean(fscs) * 100
+
+    print(f"Mean Accuracy: {mean_acc:.2f}%")
+    print(f"Mean Precision: {mean_prec:.2f}%")
+    print(f"Mean Recall: {mean_rec:.2f}%")
+    print(f"Mean F-Score: {mean_fsc:.2f}%")
 
 # ---------------------------------- TRAINING FUNCTION ----------------------------------
 def train_model(
