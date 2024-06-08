@@ -165,6 +165,7 @@ def evaluate_model(model, X_test, Y_test, test_lengths, batch_size='default'):
   Y_test: tensor of shape [BATCH_SIZE x SEQ_LEN x SEQ_LEN] containing target edges on semantic dependency graph 
   --> (batch of padded adjacency matrices)
   test_lengths: tensor of shape [BATCH_SIZE] containing sequence lengths
+  batch_size : kwarg to be used to indicate batch size in case test sets are too large for inference (applies to models with Biaffine scorer)
   '''
     accs, precs, recs, fscs = [], [], [], []
     if batch_size == 'default':
