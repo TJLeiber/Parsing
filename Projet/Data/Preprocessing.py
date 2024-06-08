@@ -59,15 +59,19 @@ def extract_from_dm(dm_examples_str: str, max_length=None, include_root=True):
       actual_max_len = len(max(sentences, key=len)) - 1 # root is excluded
 
     # get the labels (adjacency matrices) for each example
+
+    # only create adjacency matrices for sequences <= max_length
     if max_length is not None:
       if include_root:
         Y = [get_dm_adj_mtrx(df, actual_max_len) for df in df_lst if len(df[1].tolist()) <= max_length]
-      else:
+      else: # if we do not want to include root
         Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=False) for df in df_lst if len(df[1].tolist()) <= max_length]
+
+    # create adjacency matrices for sequences of any length
     else:
       if include_root:
         Y = [get_dm_adj_mtrx(df, actual_max_len) for df in df_lst]
-      else:
+      else: # if we do not want to include root 
         Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=False) for df in df_lst]
 
 
