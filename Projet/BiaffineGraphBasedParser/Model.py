@@ -102,6 +102,7 @@ def get_and_contract_BERT(model, tokenizer, input, include_root=True):
   return out
 
 
+# this is the last layer in the model, outputting an adjacency matrix of PADDED sentences
 class Biaffine(nn.Module):
     '''
     biaffine scorer --> used to compute v.U.u + W.(concat(v, u)) + b
@@ -266,7 +267,7 @@ class GraphBasedParser(nn.Module):
     def __init__(self, MLP_hidden_layer=600, d=600, embed="static", vocab=None, POS_Embeddings=False, scorer="SimpleBiaffine"):
         super(GraphBasedParser, self).__init__()
 
-        # initialize embeddings
+        # when we use GloVe pretrained embeddings
         if embed=="static":
           self.embed = "static"
           print("loading pretrained embeddings...")
@@ -275,28 +276,52 @@ class GraphBasedParser(nn.Module):
           self.w2i = glove.w2i
           self.i2w = glove.vocab
           print("embeddings loaded!")
+
+        # when we learn embeddings based on the training set requires to pass vocab as kwarg when initializing Parser
         elif embed == "scratch":
           self.embed="scratch"
           self.embeddings = nn.Embedding(len(vocab), 100)
           self.embeddings.weight.requires_grad = True # enables fine tuning of embeddings
           self.vocab = vocab
           self.w2i = get_w2i(self.vocab)
+
+        # when we use BERT encodings only
         elif embed == "contextual":
           self.embed="contextual"
           self.bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")  # automatically yields FastTokenizer if possible
-
-          # self.bert_tokenizer.cls_token='<ROOT>' # cls token will be used to predict <ROOT>
 
           self.bert_tokenizer.add_tokens('<ROOT>', special_tokens=True) # add root token as a special token
           self.bert_model = BertModel.from_pretrained("bert-base-uncased")  # loading respective BERT model
           self.bert_model.resize_token_embeddings(len(self.bert_tokenizer)) # since we added root token
           print("BERT model and tokenizer loaded!")
+
+        # when BERT encodings and pretrained embeddings are concatenated
+        elif embed == "concat":
+          self.embed = "concat"
+          # load pretrained embeddings
+          print("loading pretrained embeddings...")
+          glove = GloVe()
+          self.embeddings = nn.Embedding.from_pretrained(glove.weights, freeze=False) # glove.weights returns a tensor of size [|V| x EMBEDDINGS_DIM]
+          self.w2i = glove.w2i
+          self.i2w = glove.vocab
+          print("embeddings loaded!")
+
+          # load BERT model and tokenizer
+          self.bert_tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")  # automatically yields FastTokenizer if possible
+          self.bert_tokenizer.add_tokens('<ROOT>', special_tokens=True) # add root token as a special token
+          self.bert_model = BertModel.from_pretrained("bert-base-uncased")  # loading respective BERT model
+          self.bert_model.resize_token_embeddings(len(self.bert_tokenizer)) # since we added root token
+          print("BERT model and tokenizer loaded!")
+
+        # case of invalid choice of argument for word encoding
         else:
           raise ValueError("Invalid kwarg for 'embed'. Must choose 'static', 'contextual' or 'scratch'.")
 
         # initialize biLSTM
         if self.embed == "contextual":
           self.bilstm = nn.LSTM(768, hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33) # need to manually set size input dim to BERT size
+        elif self.embed == "concat":
+          self.bilstm = nn.LSTM(868, hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33) # need to manually set size input dim to BERT size
         else:
           self.bilstm = nn.LSTM(self.embeddings.weight.shape[1], hidden_size=d, num_layers=3, batch_first=True, bidirectional=True, dropout=0.33)
 
@@ -332,7 +357,7 @@ class GraphBasedParser(nn.Module):
           X_lengths = get_sentence_lengths(X, include_root=False).to(device)
 
         # padding vectorized sequences
-        if self.embed == "static":
+        if self.embed == "static" or self.embed == "concat":
           vectorized_X = vectorize(X, self.w2i)
           vectorized_X = pad_vect_sentences(vectorized_X, self.w2i)
           vectorized_X = vectorized_X.to(device)
@@ -341,23 +366,23 @@ class GraphBasedParser(nn.Module):
           vectorized_X = pad_vect_sentences(vectorized_X, get_w2i(self.vocab))
           vectorized_X = vectorized_X.to(device)
 
-        # needs to be placed out of no_grad context because self attention is computed in this function (contains no_grad when necessary inside of function)
-        if self.embed == "contextual" and include_root:
-          X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X) # returns padded sequence representations
-        elif self.embed == "contextual" and not include_root:
-          X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X)
-
-
-
 
         # step 1: ------------------------------------------ENCODING------------------------------------------
+
+         # needs to be placed out of no_grad context because self attention is computed in this function (contains no_grad when necessary inside of function)
+        if self.embed == "contextual":
+          X = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X, include_root=include_root) # returns padded sequence representations
 
         # tensor of size [BACTH_SIZE x SEQ_LENGTH x EMBED_SIZE]
         # no need to sort in decreasing order since the examples were already sorted in the very beginning to allow mapping to Y_train, i.e. adjacency matrices
         if self.embed == "static" or self.embed == "scratch":
           X = self.embeddings(vectorized_X)
 
-        # packed X_train of size [batch_sum_seq_len X EMBEDDINGS_SIZE] --> used for biLSTM encoding only
+        if self.embed == "concat":
+          X_1 = get_and_contract_BERT(self.bert_model, self.bert_tokenizer, X, include_root=include_root) # returns padded sequence representations
+          X_2 = self.embeddings(vectorized_X)
+          X = torch.cat((X_1, X_2), dim=-1) # tensor of shape [BATCH_SIZE x SEQ_LENGTH x 868]
+
         X = pack_padded_sequence(X, X_lengths.cpu().numpy(), enforce_sorted=is_sorted, batch_first=True)
         X = X.to(device)
         # sizes ...
