@@ -82,7 +82,7 @@ def get_and_contract_BERT(model, tokenizer, input, include_root=True):
                                                     is_split_into_words=True,
                                                     return_tensors='pt'
                                                     ).to(device), # need to move tensor because by default py tensors are move to the cpu by tokenizer
-                              input)) # in this case '<ROOT>' will be a special token of the tokenizer which has to be learned
+                              input)) # in this case '<ROOT>' will be a special token of the tokenizer which has to be learned by the model
   else:
     max_length = max_length - 1 # note that not including root takes one off the maximum length sequences will be padded to
     tokenizer_out = list(# create a list...
