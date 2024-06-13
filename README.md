@@ -7,4 +7,4 @@ numpy<br>
 pytorch<br>
 Python3<br>
 
-## Uasage
+## Usage
