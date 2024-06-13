@@ -36,7 +36,7 @@ def get_dm_adj_mtrx(df, seq_length, include_root=True):
 
   return adj_mtrx
 
-def extract_from_dm(dm_examples_str: str, max_length=None, include_root=True):
+def extract_from_dm(dm_examples_str: str, min_length= None, max_length=None, include_root=True):
     '''takes as input a set of dm examples as a single string and outputs
     a list of lists of strings, representing sentences (in decreasing order of their length)
 
@@ -55,11 +55,14 @@ def extract_from_dm(dm_examples_str: str, max_length=None, include_root=True):
 
     # get the sentences
     if max_length is not None:
-      sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst if len(df[1].tolist()) <= max_length]
-      actual_max_len = len(max(sentences, key=len)) - 1 # root is excluded
-    else: # i.e. if no upper bound was given
+      if min_length is not None: # both lower and upper bound
+        sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst if len(df[1].tolist()) <= max_length and len(df[1].tolist()) >= min_length]
+      else: # upper bound only
+        sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst if len(df[1].tolist()) <= max_length]
+    elif min_length is not None: # lower bound only
+      sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst if len(df[1].tolist()) >= min_length]
+    else: # no upper/lower bound
       sentences = [["<ROOT>"] + df[1].tolist() for df in df_lst]
-      actual_max_len = len(max(sentences, key=len)) # maximum sentence length in data can be less than upper bound (max_length)
 
     if include_root:
       actual_max_len = len(max(sentences, key=len)) # root is excluded
@@ -69,18 +72,18 @@ def extract_from_dm(dm_examples_str: str, max_length=None, include_root=True):
     # get the labels (adjacency matrices) for each example
 
     # only create adjacency matrices for sequences <= max_length
-    if max_length is not None:
-      if include_root:
-        Y = [get_dm_adj_mtrx(df, actual_max_len) for df in df_lst if len(df[1].tolist()) <= max_length]
-      else: # if we do not want to include root
-        Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=False) for df in df_lst if len(df[1].tolist()) <= max_length]
+    if max_length is not None and min_length is not None:
+        Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=include_root) for df in df_lst if len(df[1].tolist()) <= max_length and len(df[1].tolist()) >= min_length]
+        
+    elif max_length is not None: # if only upper bound
+        Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=include_root) for df in df_lst if len(df[1].tolist()) <= max_length]
+
+    elif min_length is not None: # if only lower bound
+      Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=include_root) for df in df_lst if len(df[1].tolist()) >= min_length]
 
     # create adjacency matrices for sequences of any length
-    else:
-      if include_root:
-        Y = [get_dm_adj_mtrx(df, actual_max_len) for df in df_lst]
-      else: # if we do not want to include root 
-        Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=False) for df in df_lst]
+    else: # if neither upper not lower bound
+      Y = [get_dm_adj_mtrx(df, actual_max_len, include_root=include_root) for df in df_lst]
 
 
     # concatenate all adjacency matrices along a new dimension
