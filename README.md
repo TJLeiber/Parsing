@@ -6,5 +6,6 @@ Transformers<br>
 NumPy<br>
 Pytorch<br>
 Python3<br>
+NLTK<br>
 
 ## Usage
