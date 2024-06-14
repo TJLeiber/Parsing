@@ -5,7 +5,7 @@ A semantic dependency parsing module for english which leverages a biaffine grap
 Transformers<br>
 NumPy<br>
 Pytorch<br>
-Python3<br>
 NLTK<br>
+Python3<br>
 
 ## Usage
