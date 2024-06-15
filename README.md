@@ -13,8 +13,8 @@ Python3<br>
 There are two main ways of interacting with the library besides writing your own script:<br> 
 (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
 <br>
-###(1) Running main.py from command line
-<br>
+### (1) Running main.py from command line
+
 This intro assumes you navigated to ~/path/to/directory/BiaffineGraphBasedParser/Projet<br>
 runnign the main.py script allows you to parse sentences from a source txt file to a target txt file.
 Information on syntax can be found via the -h, --help options when running the script
@@ -54,4 +54,4 @@ We get the following file as output:
 <br>
 <br>
 ![out_structured.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.17.24.png)
-###(2) Using the parser through direct interaction with the python interpreter
+### (2) Using the parser through direct interaction with the python interpreter
