@@ -29,11 +29,12 @@ Given this syntax the most simple way of parsing an unstructured text is to simp
 ![parsing options](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.49.12.png)
 <br>
 <br>
-The command should have alloed you to go from a file like the following:
+The command should have allowed you to go from a file like the following:
 ![source.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.41.01.png)
 <br>
 <br>
 To the following target file containing parsed sentences:
+<br><br>
 ![target.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.56.04.png)
 <br>
 <br>
@@ -47,6 +48,8 @@ In order to use the -i, --individual_sentences option the source file must conta
 <br>
 <br>
 Hence given as command in terminal:
+<br>
+<br>
 ![command_structured](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.15.56.png)
 <br>
 <br>
