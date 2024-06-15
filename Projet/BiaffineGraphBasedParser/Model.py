@@ -263,7 +263,7 @@ class SplitMLP(nn.Module):
 
 class GraphBasedParser(nn.Module):
 
-    def __init__(self, MLP_hidden_layer=600, d=600, embed="static", vocab=None, POS_Embeddings=False, scorer="SimpleBiaffine"):
+    def __init__(self, MLP_hidden_layer=600, d=600, embed="static", vocab=None, scorer="SimpleBiaffine"):
         super(GraphBasedParser, self).__init__()
 
         # when we use GloVe pretrained embeddings
