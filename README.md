@@ -30,6 +30,8 @@ Given this syntax the most simple way of parsing an unstructured text is to simp
 <br>
 <br>
 The command should have allowed you to go from a file like the following:
+<br>
+<br>
 ![source.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.41.01.png)
 <br>
 <br>
