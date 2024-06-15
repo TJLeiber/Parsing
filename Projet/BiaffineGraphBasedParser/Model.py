@@ -188,8 +188,7 @@ class SimpleBiaffine(nn.Module):
         D = torch.cat((D, ones), dim=2) # add bias
 
         # -------------------- v.U.u --------------------
-        U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x NB_CLASSES x SEQ_LENGTH x SEQ_LENGTH]
-        # U_product.squeeze(1) # we only have one output class
+        U_product = torch.einsum("bxi,ij,byj->bxy", D, self.U, H)  # [BATCH_SIZE x SEQ_LENGTH x SEQ_LENGTH]
 
         return U_product
 
