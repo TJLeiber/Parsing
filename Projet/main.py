@@ -89,7 +89,7 @@ def main():
     assert args.source_file is not None, "Please provide a source file as input to be parsed. For help pass 'python main.py -h'."
     with open(args.source_file, "r") as f:
         if args.individual_sentences:
-            sentences = [sent.rstrip("\n") for sent in f.readlines()[:-1]] # given a structured file with each line being a sentence
+            sentences = [sent.rstrip("\n") for sent in f.readlines()] # given a structured file with each line being a sentence
         else:
             sentences = sent_tokenize(f.read(), language="english") # given an entire text
 
