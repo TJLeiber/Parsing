@@ -67,7 +67,7 @@ Use the python command to interact with your interpreter then make the following
 <br>
 <br>
 A parser is initialized with two kwargs model="fast" | "default" (fast only using GloVe embeddings) and device="cpu" | "gpu".<br><br>
-![init](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.03.53.png)
+![init](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.22.21.png)
 <br><br>
 
 The parser basically allows three output types for sentences that are handed to it, pandas dataframe, torch tensor, target_file to write into.<br>
