@@ -19,6 +19,11 @@ This intro assumes you navigated to ~/path/to/directory/BiaffineGraphBasedParser
 runnign the main.py script allows you to parse sentences from a source txt file to a target txt file.
 Information on syntax can be found via the -h, --help options when running the script
 <br>
+<br>
 ![Alt text](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.23.56.png)
+<br>
+<br>
 Given this syntax the most simple way of parsing an unstructured text is to simple hand the source file to the parser:
+<br>
+<br>
 ![Alt text](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.41.01.png)
