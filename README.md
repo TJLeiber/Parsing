@@ -78,3 +78,10 @@ another optional argument is_split_into_words can be used to indicate that the s
 Here the same example from before, with a list containing whole sentences. As output types we chose both the torch tensor and the list of pandas dataframes.
 <br>
 <br>
+![parsing_commands](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.34.18.png)
+<br>
+<br>
+Here the output as torch tensor:
+<br>
+<br>
+![parsing_commands](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.35.19.png)
