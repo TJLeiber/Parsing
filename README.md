@@ -15,4 +15,7 @@ There are two main ways of interacting with the library besides writing your own
 <br>
 -------------------------- (1) --------------------------
 <br>
-This intro assumes you navigated to ~/.../BiaffineGraphBasedParser/Projet <br>
+This intro assumes you navigated to ~/path/to/directory/BiaffineGraphBasedParser/Projet<br>
+runnign the main.py script allows you to parse sentences from a source txt file to a target txt file.
+
+<br>
