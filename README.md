@@ -43,3 +43,6 @@ The very first row indicates which word is root.
 <br> Argument -c, --concat changes the underlying parser that is used, i.e. a parser using BERT + GloVe word encodings which can boost performance at the cost of inference speed.<br>
 Using -g, --gpu will attempt to perform inference on an available gpu<br>
 In order to use the -i, --individual_sentences option the source file must contain text s.t. each line contains a single sentence. This effectively allows the use to parse specific sentences.<br>Here is an example on the required structure of a source file when using -i:<br><br>
+![structured_source.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.08.30.png)
+<br>
+<br>
