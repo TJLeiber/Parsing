@@ -20,7 +20,7 @@ runnign the main.py script allows you to parse sentences from a source txt file 
 Information on syntax can be found via the -h, --help options when running the script
 <br>
 <br>
-![help option on main.py](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.23.56.png)
+![help option on main.py](misc/Screenshot%202024-06-15%20at%2010.23.56.png)
 <br>
 <br>
 Given this syntax the most simple way of parsing an unstructured text is to simple hand the source file to the parser:
