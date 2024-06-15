@@ -10,4 +10,9 @@ gensim (version >= 4.3.0 recommended)<br>
 Python3<br>
 
 ## Usage
-There are two main ways of interacting with the library besides writing your own script:<br> (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
+There are two main ways of interacting with the library besides writing your own script:<br> 
+(1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
+<br>
+-------------------------- (1) --------------------------
+<br>
+This intro assumes you navigated to ~/.../BiaffineGraphBasedParser/Projet <br>
