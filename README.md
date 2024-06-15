@@ -60,3 +60,7 @@ We get the following file as output:
 <br>
 ![out_structured.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.17.24.png)
 ### (2) Using the parser through direct interaction with the python interpreter
+Use the python command to interact with your interpreter then make the following two imports (again we assume you have navigated to ~/path/to/directory/BiaffineGraphBasedParser/Projet)
+<br>
+<br>
+
