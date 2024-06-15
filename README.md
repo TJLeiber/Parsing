@@ -53,4 +53,4 @@ Hence given as command in terminal:
 We get the following file as output:
 <br>
 <br>
-
+![out_structured.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.17.24.png)
