@@ -15,10 +15,16 @@ class Parser:
         if device == 'gpu' and self.device == torch.device('cpu'):
             print("No GPU found. Moving on to CPU.")
 
-        model_path = "../models/model_static.pth" if model == "fast" else "../models/model_concat.pth"
+        if model == "fast":
+            model_path = "../models/model_static.pth"
+        elif model == "default":
+            model_path = "../models/model_concat.pth"
+        else:
+            raise ValueError(f"Invalid input for kwarg 'model'. Must chose either 'fast' or 'default' not {model}.")
         try:
             self.model = torch.load(model_path, map_location=self.device)
             assert isinstance(self.model, GraphBasedParser), "Loaded model is not of type GraphBasedParser."
+            self.model.eval()
         except Exception as e:
             raise RuntimeError(f"Error loading model: {e}")
 
