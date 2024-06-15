@@ -9,11 +9,11 @@ NLTK (version >= 3.8.1 recommended)<br>
 gensim (version >= 4.3.0 recommended)<br>
 Python3<br>
 
-### Usage
+## Usage
 There are two main ways of interacting with the library besides writing your own script:<br> 
 (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
 <br>
-## (1) Running main.py from command line
+### (1) Running main.py from command line
 <br>
 This intro assumes you navigated to ~/path/to/directory/BiaffineGraphBasedParser/Projet<br>
 runnign the main.py script allows you to parse sentences from a source txt file to a target txt file.
