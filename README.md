@@ -9,7 +9,7 @@ NLTK (version >= 3.8.1 recommended)<br>
 gensim (version >= 4.3.0 recommended)<br>
 Python3<br>
 
-## Usage
+### Usage
 There are two main ways of interacting with the library besides writing your own script:<br> 
 (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
 <br>
@@ -54,4 +54,4 @@ We get the following file as output:
 <br>
 <br>
 ![out_structured.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.17.24.png)
-## (2) Using the parser through direct interaction with the python interpreter
+### (2) Using the parser through direct interaction with the python interpreter
