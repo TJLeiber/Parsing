@@ -26,4 +26,12 @@ Information on syntax can be found via the -h, --help options when running the s
 Given this syntax the most simple way of parsing an unstructured text is to simple hand the source file to the parser:
 <br>
 <br>
+![parsing options](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.49.12.png)
+<br>
+<br>
+The command should have alloed you to go from a file like the following:
 ![source.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.41.01.png)
+<br>
+<br>
+To the following target file containing parsed sentences:
+
