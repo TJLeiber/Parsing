@@ -46,3 +46,11 @@ In order to use the -i, --individual_sentences option the source file must conta
 ![structured_source.txt](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.08.30.png)
 <br>
 <br>
+Hence given as command in terminal:
+![command_structured](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2011.15.56.png)
+<br>
+<br>
+We get the following file as output:
+<br>
+<br>
+
