@@ -63,4 +63,4 @@ We get the following file as output:
 Use the python command to interact with your interpreter then make the following two imports (again we assume you have navigated to ~/path/to/directory/BiaffineGraphBasedParser/Projet)
 <br>
 <br>
-
+![commands](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.03.53.png)
