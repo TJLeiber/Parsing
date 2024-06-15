@@ -64,3 +64,16 @@ Use the python command to interact with your interpreter then make the following
 <br>
 <br>
 ![commands](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.03.53.png)
+<br>
+<br>
+A parser is initialized with two kwargs model="fast" | "default" (fast only using GloVe embeddings) and device="cpu" | "gpu".<br><br>
+![init](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2012.03.53.png)
+<br><br>
+
+The parser basically allows three output types for sentences that are handed to it, pandas dataframe, torch tensor, target_file to write into.<br>
+Both former ones will be outputted in a dictionary, the latter option will either create a new file at the specified location or the parser sentences will be appended to the file if it already exists.
+<br>
+another optional argument is_split_into_words can be used to indicate that the sentences in the list object handed to the parser have already been tokenized.
+<br>
+Here the same example from before, with a list containing whole sentences.
+<br>
