@@ -39,3 +39,7 @@ To the following target file containing parsed sentences:
 <br>
 Each sentence is preceded by a number. The grid following a number is a grid s.t. for an entry i,j 1 means word i is a head of word j.<br>
 The very first row indicates which word is root.
+<br>
+<br> Argument -c, --concat changes the underlying parser that is used, i.e. a parser using BERT + GloVe word encodings which can boost performance at the cost of inference speed.<br>
+Using -g, --gpu will attempt to perform inference on an available gpu<br>
+In order to use the -
