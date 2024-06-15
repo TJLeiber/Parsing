@@ -19,4 +19,4 @@ This intro assumes you navigated to ~/path/to/directory/BiaffineGraphBasedParser
 runnign the main.py script allows you to parse sentences from a source txt file to a target txt file.
 Information on syntax can be found via the -h, --help options when running the script
 <br>
-![Alt text](BiaffineGraphBasedParser/misc/Screenshot 2024-06-15 at 10.23.56.png)
+![Alt text](https://github.com/TJLeiber/BiaffineGraphBasedParser/blob/main/misc/Screenshot%202024-06-15%20at%2010.23.56.png)
