@@ -3,11 +3,12 @@ A semantic dependency parsing module for english which leverages a biaffine grap
 
 ## Requirements
 Transformers (version >= 4.41.2 recommended)<br>
+Pandas (version >= 2.2.2 recommended)
 NumPy (version >= 1.26.4 recommended)<br>
 Pytorch (version >= 2.2.0.post100 recommended)<br>
 NLTK (version >= 3.8.1 recommended)<br>
 gensim (version >= 4.3.0 recommended)<br>
---> scipy (gensim import without manually installing scipy version <= 1.11.4 can cause errors...)
+--> scipy (gensim import without manually installing scipy version <= 1.11.4 can cause errors. We recommend a version <= 1.13)
 Python3 (We used version 3.11.9)<br>
 
 Hence ideally follow these steps to run the program:<br>
@@ -25,7 +26,9 @@ Hence ideally follow these steps to run the program:<br>
 
 (6) pip install nltk
 
-(7) pip install transformers==4.41.2
+(7) pip install pandas
+
+(8) pip install transformers==4.41.2
 
 ## Known Errors
 -An error that might occur when installing gensim without specifying the scipy version is ImportError: cannot import name 'triu' from 'scipy.linalg' since triu from linalg has become deprecated in scipy 1.13
