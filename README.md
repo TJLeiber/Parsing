@@ -8,7 +8,7 @@ Pytorch (version >= 2.2.0.post100 recommended)<br>
 NLTK (version >= 3.8.1 recommended)<br>
 gensim (version >= 4.3.0 recommended)<br>
 --> scipy (gensim import without manually installing scipy version <= 1.11.4 can cause errors...)
-Python3<br>
+Python3 (We used version 3.11.9)<br>
 
 Hence ideally follow these steps to run the program:<br>
 (1) create a new venv to run this program (test was done with a fresh conda environment)
@@ -17,7 +17,20 @@ Hence ideally follow these steps to run the program:<br>
 
 (3) pip install scipy==1.11.4
 
-(4)
+(4) pip install gensim
+
+(4) pip install numpy
+
+(5) pip install torch
+
+(6) pip install nltk
+
+(7) pip install transformers==4.41.2
+
+## Known Errors
+-An error that might occur when installing gensim without specifying the scipy version is ImportError: cannot import name 'triu' from 'scipy.linalg' since triu from linalg has become deprecated in scipy 1.13
+
+-Another Error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one
 
 ## Usage
 There are two main ways of interacting with the library besides writing your own script:<br> 
