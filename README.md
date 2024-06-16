@@ -12,7 +12,7 @@ gensim (version >= 4.3.0 recommended)<br>
 Python3 (We used version 3.11.9)<br>
 
 Hence ideally follow these steps to run the program:<br>
-(1) create a new venv to run this program (test was done with a fresh conda environment)
+(1) create a new virtual environment to run this program (test was done with a fresh conda environment)
 
 (2) conda activate MyNewEnv
 
