@@ -80,7 +80,7 @@ In order to use the -i, --individual_sentences option the source file must conta
 ![structured_source.txt](misc/Screenshot%202024-06-15%20at%2011.08.30.png)
 <br>
 <br>
-Hence given as command in terminal:
+Hence when using the following command in terminal:
 <br>
 <br>
 ![command_structured](misc/Screenshot%202024-06-15%20at%2011.15.56.png)
