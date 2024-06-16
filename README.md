@@ -33,7 +33,8 @@ Hence ideally follow these steps to run the program:<br>
 ## Known Errors
 -An error that might occur when installing gensim without specifying the scipy version is ImportError: cannot import name 'triu' from 'scipy.linalg' since triu from linalg has become deprecated in scipy 1.13
 
--Another Error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one
+-Another error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one<br>
+This error may occur when using -c, --concat option without the correct transformers version.
 
 -When running the script you may be asked to first run the following:
 "import nltk<br>
