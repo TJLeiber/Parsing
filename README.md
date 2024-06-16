@@ -35,6 +35,10 @@ Hence ideally follow these steps to run the program:<br>
 
 -Another Error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one
 
+-When running the script you may be asked to first run the following:
+"import nltk<br>
+nltk.download("punkt")"<br>
+
 ## Usage
 There are two main ways of interacting with the library besides writing your own script:<br> 
 (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
