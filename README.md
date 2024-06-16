@@ -7,6 +7,7 @@ NumPy (version >= 1.26.4 recommended)<br>
 Pytorch (version >= 2.2.0.post100 recommended)<br>
 NLTK (version >= 3.8.1 recommended)<br>
 gensim (version >= 4.3.0 recommended)<br>
+--> scipy (gensim import without manually installing scipy version <= 1.11.4 can cause errors...)
 Python3<br>
 
 ## Usage
