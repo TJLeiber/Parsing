@@ -10,6 +10,15 @@ gensim (version >= 4.3.0 recommended)<br>
 --> scipy (gensim import without manually installing scipy version <= 1.11.4 can cause errors...)
 Python3<br>
 
+Hence ideally follow these steps to run the program:<br>
+(1) create a new venv to run this program (test was done with a fresh conda environment)
+
+(2) conda activate MyNewEnv
+
+(3) pip install scipy==1.11.4
+
+(4)
+
 ## Usage
 There are two main ways of interacting with the library besides writing your own script:<br> 
 (1) running the main.py script from command line, (2) through direct interaction with the Python interpreter<br>
