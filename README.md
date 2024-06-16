@@ -31,12 +31,12 @@ Hence ideally follow these steps to run the program:<br>
 (8) pip install transformers==4.41.2
 
 ## Known Errors
--An error that might occur when installing gensim without specifying the scipy version is ImportError: cannot import name 'triu' from 'scipy.linalg' since triu from linalg has become deprecated in scipy 1.13
+(a) An error that might occur when installing gensim without specifying the scipy version is ImportError: cannot import name 'triu' from 'scipy.linalg' since triu from linalg has become deprecated in scipy 1.13
 
--Another error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one<br>
+(b) Another error concerning attributes of the loaded BERT model may occur when running a transformers version older than the recommended one<br>
 This error may occur when using -c, --concat option without the correct transformers version.
 
--When running the script you may be asked to first run the following:
+(c) When running the script you may be asked to first run the following:
 "import nltk<br>
 nltk.download("punkt")"<br>
 
